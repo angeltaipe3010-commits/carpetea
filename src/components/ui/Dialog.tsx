@@ -18,6 +18,9 @@ interface DialogProps {
   locked?: boolean
 }
 
+// Pila de diálogos abiertos: Escape y la trampa de foco solo actúan en el de arriba.
+const stack: string[] = []
+
 export function Dialog({ open, onClose, title, description, children, footer, width = 'md', locked }: DialogProps) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
@@ -25,7 +28,9 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
   useEffect(() => {
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
+    stack.push(titleId)
     const onKey = (e: KeyboardEvent) => {
+      if (stack[stack.length - 1] !== titleId) return
       if (e.key === 'Escape' && !locked) onClose()
       // Trampa de foco simple dentro del diálogo.
       if (e.key === 'Tab' && panel.current) {
@@ -50,10 +55,12 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
       target?.focus()
     })
     return () => {
+      const i = stack.lastIndexOf(titleId)
+      if (i !== -1) stack.splice(i, 1)
       document.removeEventListener('keydown', onKey)
       prev?.focus?.()
     }
-  }, [open, onClose, locked])
+  }, [open, onClose, locked, titleId])
 
   return createPortal(
     <AnimatePresence>

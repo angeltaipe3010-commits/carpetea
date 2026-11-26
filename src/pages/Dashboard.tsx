@@ -13,6 +13,7 @@ import { list, listItem } from '@/lib/motion'
 import { useHistory } from '@/stores/history'
 import { useOrganizer } from '@/stores/organizer'
 import { useRules } from '@/stores/rules'
+import { useSettings } from '@/stores/settings'
 import { describeCondition } from '@/utils/rules'
 import type { SourceFolder } from '@/types'
 
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const operations = useHistory((s) => s.operations)
   const { rules, toggle } = useRules()
+  const reviewName = useSettings((s) => s.reviewFolderName)
   const selectSource = useOrganizer((s) => s.selectSource)
   const [folders, setFolders] = useState<SourceFolder[] | null>(null)
 
@@ -34,9 +36,9 @@ export default function Dashboard() {
     const moved = operations.flatMap((o) => o.moves).filter((m) => m.status === 'moved').length
     const analyzed = organize.reduce((s, o) => s + o.moves.length, 0)
     const folders = organize.reduce((s, o) => s + o.foldersCreated.length, 0)
-    const review = operations.flatMap((o) => o.moves).filter((m) => m.status === 'moved' && m.to.startsWith('Por revisar')).length
+    const review = operations.flatMap((o) => o.moves).filter((m) => m.status === 'moved' && m.to.split(/[\\/]/).includes(reviewName)).length
     return { moved, analyzed, folders, review, last: organize[0] }
-  }, [operations])
+  }, [operations, reviewName])
 
   const start = (f: SourceFolder) => {
     selectSource(f)

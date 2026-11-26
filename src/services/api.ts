@@ -6,7 +6,7 @@
  * Fase 2 se añadirá `tauriApi`, que llama a comandos de Rust con `invoke` y
  * recibe el progreso por eventos; las pantallas no tendrán que cambiar.
  */
-import { DUPLICATE_GROUPS, EXISTING_AT_DEST, MOCK_FILES, SOURCE_FOLDERS } from '@/data/mock'
+import { DUPLICATE_GROUPS, EXISTING_FILES, MOCK_FILES, SOURCE_FOLDERS } from '@/data/mock'
 import { classify } from '@/services/classifier'
 import type {
   DuplicateGroup,
@@ -27,7 +27,15 @@ export interface DeskFlowApi {
   /** Indica si las operaciones afectan al disco real. */
   readonly mode: 'mock' | 'native'
   listSuggestedFolders(): Promise<SourceFolder[]>
-  scan(sourceId: string, opts: ScanOptions, rules: Rule[], onProgress: (p: ScanProgress) => void, signal: AbortSignal): Promise<ScanResult>
+  /** `skipDirs`: carpetas relativas al origen que DeskFlow ya organizó; no se vuelven a analizar. */
+  scan(
+    sourceId: string,
+    opts: ScanOptions,
+    rules: Rule[],
+    skipDirs: string[],
+    onProgress: (p: ScanProgress) => void,
+    signal: AbortSignal,
+  ): Promise<ScanResult>
   execute(plan: OrganizePlan, onProgress: (p: ExecProgress) => void, signal: AbortSignal): Promise<Operation>
   undo(op: Operation, onProgress: (p: ExecProgress) => void): Promise<Operation>
   findDuplicates(onProgress: (p: DuplicateProgress) => void, signal: AbortSignal): Promise<DuplicateGroup[]>
@@ -53,11 +61,18 @@ const mockApi: DeskFlowApi = {
     return SOURCE_FOLDERS
   },
 
-  async scan(sourceId, opts, rules, onProgress, signal) {
+  async scan(sourceId, opts, rules, skipDirs, onProgress, signal) {
     const t0 = performance.now()
     const source = SOURCE_FOLDERS.find((s) => s.id === sourceId)
     if (!source) throw new Error('Carpeta no encontrada')
-    const files = MOCK_FILES[sourceId].filter((f) => opts.recursive || !f.relDir)
+    const skip = skipDirs.map((d) => d.toLowerCase())
+    const inManaged = (relDir: string) => {
+      const r = relDir.toLowerCase()
+      return !!r && skip.some((d) => r === d || r.startsWith(d + '/'))
+    }
+    const candidates = MOCK_FILES[sourceId].filter((f) => opts.recursive || !f.relDir)
+    const files = candidates.filter((f) => !inManaged(f.relDir))
+    const skippedManaged = candidates.length - files.length
     const total = files.length
     const tick = (phase: ScanProgress['phase'], processed: number, current: string) =>
       onProgress({ phase, processed, total, current })
@@ -86,7 +101,7 @@ const mockApi: DeskFlowApi = {
     }
     tick('done', total, '')
     await sleep(240, signal)
-    return { source, files, classifications, existing: EXISTING_AT_DEST[sourceId] ?? [], durationMs: performance.now() - t0 }
+    return { source, files, classifications, existing: EXISTING_FILES, skippedManaged, durationMs: performance.now() - t0 }
   },
 
   async execute(plan, onProgress, signal) {
@@ -115,6 +130,7 @@ const mockApi: DeskFlowApi = {
       kind: 'organize',
       createdAt: new Date().toISOString(),
       source: plan.sourcePath,
+      destination: plan.destinationLabel,
       status: errors.length ? 'partial' : 'completed',
       moves,
       foldersCreated: plan.foldersToCreate,

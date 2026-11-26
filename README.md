@@ -48,6 +48,17 @@ Las preferencias, reglas e historial del prototipo se guardan en `localStorage`.
 - Conflictos de nombre detectados (mismo nombre en el destino, o archivo que ya existe) con política *Renombrar con (1)* o *No mover*.
 - Lo que se confirma es exactamente el plan calculado por `buildPlan`, no una simulación aparte.
 
+**Destino de lo organizado** (en Organizar y en Configuración; se recuerda la última elección):
+- **Misma carpeta:** la estructura se crea dentro del origen.
+- **Bibliotecas de Windows:** Documentos y Proyectos van a *Documentos*, Imágenes a *Imágenes*, Videos a *Vídeos* y Audio a *Música*. Programas, comprimidos y *Por revisar* se quedan en el origen.
+- **Otra carpeta:** cualquier carpeta local, elegida con el selector, que también permite crear carpetas nuevas.
+- **Nube solo con confirmación:** si el destino está sincronizado (OneDrive, Google Drive, Dropbox, iCloud, Box, MEGA), incluidas las bibliotecas de Windows redirigidas a OneDrive, aparece un aviso “¿Guardar en OneDrive?”.
+  - **Sí:** se permite. Queda señalado en el destino, en la vista previa y en la confirmación.
+  - **No:** DeskFlow busca una carpeta Documentos que esté solo en el equipo y la usa. Si no existe, la crea (`C:\Users\…\Documentos`). Se puede cambiar después.
+  - Cerrar el aviso sin elegir no cambia nada. Las carpetas del sistema siguen bloqueadas.
+- **Escenario simulado:** el prototipo imita un Windows 11 con la copia de seguridad de OneDrive activada (Documentos e Imágenes en OneDrive, sin carpeta Documentos local), para que se pueda probar el flujo completo.
+- **No reorganiza lo ya ordenado:** DeskFlow recuerda las carpetas que creó y las omite al volver a analizar el origen. Si deshaces una operación, esas carpetas vuelven a analizarse.
+
 **Simulado a propósito:** el análisis, los movimientos y el deshacer se ejecutan en memoria con tiempos ficticios (`src/services/api.ts`). La simulación incluye un archivo bloqueado (`DiscordSetup.exe`) y un archivo modificado al deshacer, para mostrar cómo se informan los errores.
 
 **Señalado como no disponible:** elegir otra carpeta con el selector nativo de Windows, monitoreo de carpetas, IA opcional e idioma inglés.
@@ -100,6 +111,7 @@ src/
 
 ## Pendiente y riesgos
 
+- **Selector y detección de nube reales:** el selector del prototipo recorre un sistema de archivos simulado (`services/localFs.ts`). En la Fase 2 se usará el diálogo nativo (`@tauri-apps/plugin-dialog`), y Rust detectará la sincronización: por nombre (`utils/destination.ts`) y con los atributos de Windows de archivos en la nube (`FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, Cloud Files API). Las bibliotecas saldrán de `SHGetKnownFolderPath`, que revela si están redirigidas a OneDrive. El aviso y la carpeta Documentos local de respaldo (`findOrCreateLocalDocuments`) funcionarán igual.
 - **Rust no está instalado en este equipo.** Es necesario para la Fase 2 (`rustup`, y Visual Studio Build Tools con C++ en Windows).
 - **Arrastrar y soltar con Tauri en Windows:** con `dragDropEnabled: true` (valor por defecto), Tauri intercepta los eventos y el arrastre HTML5 interno deja de funcionar. Habrá que poner `dragDropEnabled: false` en la ventana y usar el evento de Tauri solo para soltar carpetas del sistema.
 - **Listas grandes:** la vista previa renderiza todos los archivos. Con miles de archivos hará falta virtualizar la lista (por ejemplo, `@tanstack/react-virtual`).

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { MotionPref, ThemePref } from '@/types'
+import type { Destination, MotionPref, ThemePref } from '@/types'
 
 /** Preferencias. En el prototipo viven en localStorage; en la Fase 2 pasan a SQLite. */
 interface SettingsState {
@@ -13,6 +13,8 @@ interface SettingsState {
   skipHidden: boolean
   contentAnalysis: boolean
   exclusions: string[]
+  /** Destino predeterminado al organizar. */
+  destination: Destination
   set: (patch: Partial<Omit<SettingsState, 'set' | 'addExclusion' | 'removeExclusion' | 'reset'>>) => void
   addExclusion: (path: string) => void
   removeExclusion: (path: string) => void
@@ -28,6 +30,7 @@ const defaults = {
   reviewFolderName: 'Por revisar',
   skipHidden: true,
   contentAnalysis: true,
+  destination: { mode: 'source', customPath: '' } as Destination,
   exclusions: ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', '%APPDATA%', 'node_modules', '.git'],
 }
 

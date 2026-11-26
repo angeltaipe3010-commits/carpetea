@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Check, CircleExclamationPoint, Download, FolderOpen, FolderSearch, Monitor, ScanSearch, ShieldCheck, Workflow } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { DestinationField, destinationReady } from '@/components/folders/DestinationField'
 import { Panel, Skeleton, Switch } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { formatBytes, plural } from '@/lib/format'
@@ -95,6 +96,12 @@ export default function SourceStep() {
 
       <aside className="space-y-4">
         <Panel className="p-5">
+          <h2 className="text-[14px] font-semibold text-text">¿Dónde guardar lo organizado?</h2>
+          <p className="mt-0.5 mb-3.5 text-[12.5px] text-muted">Local por defecto; la nube solo si la confirmas. Se recuerda tu elección.</p>
+          <DestinationField value={settings.destination} onChange={(destination) => settings.set({ destination })} sourceName={source?.name} />
+        </Panel>
+
+        <Panel className="p-5">
           <h2 className="text-[14px] font-semibold text-text">Opciones del análisis</h2>
           <div className="mt-4 space-y-4">
             <div>
@@ -134,8 +141,8 @@ export default function SourceStep() {
           El análisis no mueve ni modifica archivos. Primero verás una vista previa completa.
         </div>
 
-        <Button variant="primary" size="lg" icon={ScanSearch} className="w-full" disabled={!source} onClick={startScan}>
-          {source ? `Analizar ${source.name}` : 'Elige una carpeta'}
+        <Button variant="primary" size="lg" icon={ScanSearch} className="w-full" disabled={!source || !destinationReady(settings.destination)} onClick={startScan}>
+          {!source ? 'Elige una carpeta' : !destinationReady(settings.destination) ? 'Elige dónde guardar' : `Analizar ${source.name}`}
         </Button>
       </aside>
     </div>

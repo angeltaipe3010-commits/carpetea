@@ -69,8 +69,10 @@ export interface ScanResult {
   source: SourceFolder
   files: FileEntry[]
   classifications: Classification[]
-  /** Rutas destino (carpeta/archivo) que ya existen en disco: generan conflictos. */
+  /** Rutas absolutas de archivos que ya existen en disco: generan conflictos. */
   existing: string[]
+  /** Archivos omitidos por estar en carpetas que DeskFlow ya organizó antes. */
+  skippedManaged: number
   durationMs: number
 }
 
@@ -100,6 +102,8 @@ export type ConflictPolicy = 'rename' | 'skip'
 export interface OrganizePlan {
   sourceId: string
   sourcePath: string
+  /** Descripción legible del destino, para el historial. */
+  destinationLabel: string
   moves: { fileId: string; name: string; from: string; to: string; finalName: string }[]
   skipped: { fileId: string; name: string; reason: string }[]
   foldersToCreate: string[]
@@ -127,6 +131,7 @@ export interface Operation {
   kind: 'organize' | 'duplicates'
   createdAt: string
   source: string
+  destination?: string
   status: OperationStatus
   moves: MoveRecord[]
   foldersCreated: string[]
@@ -182,6 +187,34 @@ export interface DuplicateProgress {
   phase: DuplicatePhase
   processed: number
   total: number
+}
+
+/**
+ * Dónde se crea la estructura organizada.
+ * - `source`: dentro de la misma carpeta que se organiza.
+ * - `libraries`: en las bibliotecas de Windows (Documentos, Imágenes, Vídeos, Música).
+ * - `custom`: en una carpeta elegida por el usuario.
+ * Una carpeta sincronizada con la nube solo se usa si el usuario lo confirma
+ * (`allowCloud`); si no, se usa una carpeta Documentos local.
+ */
+export type DestinationMode = 'source' | 'libraries' | 'custom'
+
+export interface Destination {
+  mode: DestinationMode
+  customPath: string
+  /** El usuario confirmó guardar en una carpeta sincronizada con la nube. */
+  allowCloud?: boolean
+}
+
+/** Carpeta del sistema de archivos local (lo que devuelve el selector). */
+export interface FsFolder {
+  name: string
+  path: string
+  kind: 'drive' | 'folder'
+  /** Proveedor si la carpeta está sincronizada con la nube. */
+  cloud?: string
+  /** Carpeta del sistema protegida. */
+  system?: boolean
 }
 
 export type ThemePref = 'system' | 'light' | 'dark'

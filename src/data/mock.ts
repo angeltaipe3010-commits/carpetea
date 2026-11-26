@@ -69,6 +69,9 @@ const DOWNLOADS_SEED: Seed[] = [
   ['temp_8823.tmp', 4, '2026-11-24'],
   ['documento.pdf', 290, '2026-02-08', 'Nueva carpeta'],
   ['Captura de pantalla 2026-11-18 223010.png', 640, '2026-11-18'],
+  // Ya organizados por DeskFlow en una operación anterior: se omiten al reanalizar.
+  ['Captura de pantalla 2026-11-18 223010.png', 640, '2026-11-18', 'Imágenes/Capturas'],
+  ['Screenshot 2026-11-03 091512.png', 512, '2026-11-03', 'Imágenes/Capturas'],
 ]
 
 function buildDownloads(): FileEntry[] {
@@ -172,10 +175,16 @@ export const SOURCE_FOLDERS: SourceFolder[] = [
 ]
 
 /** Rutas destino que "ya existen" en disco y provocan conflictos de nombre. */
-export const EXISTING_AT_DEST: Record<string, string[]> = {
-  downloads: ['Imágenes/Capturas/Captura de pantalla 2026-11-18 223010.png'],
-  desktop: [],
-}
+export const EXISTING_FILES: string[] = [
+  'C:\\Users\\Usuario\\Downloads\\Imágenes\\Capturas\\Captura de pantalla 2026-11-18 223010.png',
+  'C:\\Users\\Usuario\\Downloads\\Imágenes\\Capturas\\Screenshot 2026-11-03 091512.png',
+]
+
+/** Carpetas que DeskFlow creó en operaciones anteriores (en la Fase 2, tabla en SQLite). */
+export const SAMPLE_MANAGED: string[] = [
+  'C:\\Users\\Usuario\\Downloads\\Imágenes',
+  'C:\\Users\\Usuario\\Downloads\\Imágenes\\Capturas',
+]
 
 export const DEFAULT_RULES: Rule[] = [
   {
@@ -225,7 +234,8 @@ export const SAMPLE_HISTORY: Operation[] = [
     source: 'C:\\Users\\Usuario\\Documents',
     status: 'partial',
     sample: true,
-    foldersCreated: ['Estudios', 'Estudios/Programación', 'Finanzas', 'Finanzas/Facturas'],
+    destination: 'C:\\Users\\Usuario\\Documents',
+    foldersCreated: ['C:\\Users\\Usuario\\Documents\\Estudios', 'C:\\Users\\Usuario\\Documents\\Estudios\\Programación', 'C:\\Users\\Usuario\\Documents\\Finanzas', 'C:\\Users\\Usuario\\Documents\\Finanzas\\Facturas'],
     errors: ['Informe_final.docx: archivo en uso por otro proceso'],
     moves: [
       { fileId: 's1', name: 'Apuntes_Java_Semana_4.pdf', from: 'Apuntes_Java_Semana_4.pdf', to: 'Estudios/Programación/Apuntes_Java_Semana_4.pdf', status: 'moved' },
@@ -240,7 +250,8 @@ export const SAMPLE_HISTORY: Operation[] = [
     source: 'C:\\Users\\Usuario\\Desktop',
     status: 'completed',
     sample: true,
-    foldersCreated: ['Imágenes', 'Imágenes/Capturas'],
+    destination: 'C:\\Users\\Usuario\\Desktop',
+    foldersCreated: ['C:\\Users\\Usuario\\Desktop\\Imágenes', 'C:\\Users\\Usuario\\Desktop\\Imágenes\\Capturas'],
     errors: [],
     moves: [
       { fileId: 's4', name: 'Screenshot 2026-11-12 101010.png', from: 'Screenshot 2026-11-12 101010.png', to: 'Imágenes/Capturas/Screenshot 2026-11-12 101010.png', status: 'moved' },
@@ -255,13 +266,30 @@ export const SAMPLE_HISTORY: Operation[] = [
     status: 'rolled_back',
     sample: true,
     undoneAt: daysAgo(12),
-    foldersCreated: ['Videos'],
+    destination: 'C:\\Users\\Usuario\\Downloads',
+    foldersCreated: ['C:\\Users\\Usuario\\Downloads\\Videos'],
     errors: [],
     moves: [
       { fileId: 's6', name: 'clip_final.mp4', from: 'clip_final.mp4', to: 'Videos/clip_final.mp4', status: 'restored' },
     ],
   },
 ]
+
+SAMPLE_HISTORY.push({
+  id: 'op_sample_4',
+  kind: 'organize',
+  createdAt: daysAgo(20, 2),
+  source: 'C:\\Users\\Usuario\\Downloads',
+  destination: 'C:\\Users\\Usuario\\Downloads',
+  status: 'completed',
+  sample: true,
+  foldersCreated: SAMPLE_MANAGED,
+  errors: [],
+  moves: [
+    { fileId: 's7', name: 'Captura de pantalla 2026-11-18 223010.png', from: 'Captura de pantalla 2026-11-18 223010.png', to: 'Imágenes\\Capturas\\Captura de pantalla 2026-11-18 223010.png', status: 'moved' },
+    { fileId: 's8', name: 'Screenshot 2026-11-03 091512.png', from: 'Screenshot 2026-11-03 091512.png', to: 'Imágenes\\Capturas\\Screenshot 2026-11-03 091512.png', status: 'moved' },
+  ],
+})
 
 export const DUPLICATE_GROUPS: DuplicateGroup[] = [
   {

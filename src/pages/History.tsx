@@ -19,7 +19,7 @@ const canUndo = (op: Operation) => (op.status === 'completed' || op.status === '
 
 export default function History() {
   const navigate = useNavigate()
-  const { operations, replace, clearSamples } = useHistory()
+  const { operations, replace, clearSamples, removeManaged } = useHistory()
   const [open, setOpen] = useState<string | null>(operations[0]?.id ?? null)
   const [undoing, setUndoing] = useState<Operation | null>(null)
   const [progress, setProgress] = useState<ExecProgress | null>(null)
@@ -30,6 +30,8 @@ export default function History() {
     setProgress({ done: 0, total: 1, current: '' })
     const result = await api.undo(undoing, setProgress)
     replace(result)
+    // Lo deshecho ya no cuenta como organizado: se analizará de nuevo.
+    removeManaged(undoing.foldersCreated)
     setProgress(null)
     setUndoing(null)
     const restored = result.moves.filter((m) => m.status === 'restored').length
@@ -109,6 +111,11 @@ export default function History() {
                             <span>
                               Origen: <span className="font-mono text-[11.5px] text-text">{op.source}</span>
                             </span>
+                            {op.destination && op.destination !== op.source && (
+                              <span>
+                                Destino: <span className="font-mono text-[11.5px] text-text">{op.destination}</span>
+                              </span>
+                            )}
                             {op.undoneAt && <span>Deshecha {formatRelative(op.undoneAt).toLowerCase()}</span>}
                             <span className="ml-auto">
                               {canUndo(op) ? (
@@ -134,8 +141,8 @@ export default function History() {
                             <div className="mt-3 flex flex-wrap items-center gap-1.5">
                               <FolderPlus className="size-3.5 text-faint" />
                               {op.foldersCreated.slice(0, 8).map((f) => (
-                                <span key={f} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted">
-                                  {f}
+                                <span key={f} title={f} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted">
+                                  {shortPath(f, op.destination ?? op.source)}
                                 </span>
                               ))}
                               {op.foldersCreated.length > 8 && <span className="text-[11.5px] text-faint">y {op.foldersCreated.length - 8} más</span>}
@@ -144,7 +151,7 @@ export default function History() {
 
                           <ul className="mt-3 max-h-[280px] divide-y divide-border overflow-y-auto rounded-lg border border-border">
                             {op.moves.slice(0, 60).map((m) => (
-                              <MoveRow key={m.fileId} m={m} />
+                              <MoveRow key={m.fileId} m={m} source={op.source} />
                             ))}
                           </ul>
                           {op.moves.length > 60 && <p className="mt-2 text-[12px] text-faint">Mostrando 60 de {op.moves.length} movimientos.</p>}
@@ -204,6 +211,12 @@ export default function History() {
   )
 }
 
+/** Muestra la ruta relativa al destino cuando cuelga de él. */
+function shortPath(path: string, base: string) {
+  const b = base.replace(/\\+$/, '') + '\\'
+  return path.toLowerCase().startsWith(b.toLowerCase()) ? path.slice(b.length) : path
+}
+
 const MOVE_STATUS: Record<MoveRecord['status'], { label: string; tone: 'success' | 'neutral' | 'warning' | 'danger' | 'primary' }> = {
   moved: { label: 'Movido', tone: 'success' },
   restored: { label: 'Restaurado', tone: 'primary' },
@@ -212,7 +225,7 @@ const MOVE_STATUS: Record<MoveRecord['status'], { label: string; tone: 'success'
   not_restored: { label: 'No restaurado', tone: 'warning' },
 }
 
-function MoveRow({ m }: { m: MoveRecord }) {
+function MoveRow({ m, source }: { m: MoveRecord; source: string }) {
   const s = MOVE_STATUS[m.status]
   return (
     <li className="flex items-center gap-3 px-3 py-2 text-[12px]">
@@ -220,9 +233,13 @@ function MoveRow({ m }: { m: MoveRecord }) {
         <span className="block truncate text-text">{m.name}</span>
         {m.to ? (
           <span className="flex min-w-0 items-center gap-1 text-faint">
-            <span className="truncate">{m.from}</span>
+            <span className="max-w-[40%] shrink-0 truncate" title={m.from}>
+              {shortPath(m.from, source)}
+            </span>
             <ArrowRight className="size-3 shrink-0" />
-            <span className="truncate">{m.to}</span>
+            <span className="truncate" title={m.to}>
+              {m.to}
+            </span>
           </span>
         ) : null}
         {m.note && <span className="block truncate text-faint">{m.note}</span>}

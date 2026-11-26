@@ -17,6 +17,8 @@ interface TreeProps {
   onRename: (path: string, name: string) => void
   onCreate: (parent: string) => void
   reviewName: string
+  /** Texto auxiliar para las carpetas de primer nivel (p. ej. "en Documentos"). */
+  hint?: (name: string) => string | undefined
 }
 
 /**
@@ -95,6 +97,7 @@ function Row({
   onRename,
   onCreate,
   reviewName,
+  hint,
 }: TreeProps & { node: FolderNode; depth: number; open: boolean; onToggle: () => void; isRoot?: boolean; label?: string }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -193,6 +196,9 @@ function Row({
       ) : (
         <span className={cn('min-w-0 flex-1 truncate', isRoot ? 'font-semibold' : isSelected && 'font-medium')}>
           {label ?? node.name}
+          {!isRoot && node.depth === 1 && hint?.(node.name) && (
+            <span className="ml-1.5 text-[11px] font-normal text-faint">{hint(node.name)}</span>
+          )}
         </span>
       )}
       {!editing && node.isNew && !isRoot && (

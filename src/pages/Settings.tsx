@@ -4,6 +4,7 @@ import { Lock, Monitor, Moon, Plus, Sun, X } from 'lucide-react'
 import { Page, PageHeader } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
 import { Badge, Input, Panel, Segmented, Select, Switch } from '@/components/ui/primitives'
+import { DestinationField } from '@/components/folders/DestinationField'
 import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/toasts'
 
@@ -49,6 +50,12 @@ export default function Settings() {
               </option>
             </Select>
           </Row>
+        </Section>
+
+        <Section title="Destino" description="Dónde se crea la estructura organizada. Local por defecto; una carpeta en la nube solo si la confirmas.">
+          <div className="px-5 pt-1 pb-4">
+            <DestinationField value={s.destination} onChange={(destination) => s.set({ destination })} />
+          </div>
         </Section>
 
         <Section title="Organización">
@@ -134,7 +141,7 @@ export default function Settings() {
           </Row>
           <div className="mx-5 mb-4 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[12.5px] text-muted">
             <Lock className="mt-0.5 size-3.5 shrink-0 text-success" />
-            DeskFlow funciona sin conexión. No envía archivos, nombres ni estadísticas a ningún servidor.
+            DeskFlow funciona sin conexión y no envía archivos, nombres ni estadísticas a ningún servidor. Si eliges un destino sincronizado con OneDrive, Google Drive, Dropbox o iCloud, te pedirá confirmación; si no la das, usará una carpeta Documentos local.
           </div>
         </Section>
 

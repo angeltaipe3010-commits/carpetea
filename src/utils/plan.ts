@@ -2,8 +2,13 @@
  * Funciones puras que convierten la propuesta editable en árbol, conflictos
  * y plan final. La vista previa y la ejecución usan exactamente este plan,
  * así que lo que se ve es lo que se ejecuta.
+ *
+ * El árbol es lógico (segmentos como "Documentos/Finanzas"); `resolve.dir`
+ * lo traduce a rutas absolutas según el destino elegido.
  */
 import type { Classification, Conflict, FileEntry, FolderNode, OrganizePlan } from '@/types'
+import type { Resolver } from './destination'
+import { winJoin } from './destination'
 
 export const joinPath = (segs: string[]) => segs.join('/')
 
@@ -12,18 +17,15 @@ export interface Draft {
   plan: Record<string, Classification>
   excluded: Record<string, true>
   extraFolders: string[]
+  /** Archivos que ya existen en disco (rutas absolutas). */
   existing: string[]
+  resolve: Resolver
+  dirExists: (absPath: string) => boolean
 }
 
 export function buildTree(d: Draft): FolderNode {
   const root: FolderNode = { path: '', name: 'raíz', depth: 0, children: [], fileIds: [], total: 0, isNew: false }
   const index = new Map<string, FolderNode>([['', root]])
-  const existingDirs = new Set(
-    d.existing.flatMap((p) => {
-      const segs = p.split('/').slice(0, -1)
-      return segs.map((_, i) => joinPath(segs.slice(0, i + 1)))
-    }),
-  )
 
   const ensure = (segs: string[]): FolderNode => {
     let parent = root
@@ -31,7 +33,8 @@ export function buildTree(d: Draft): FolderNode {
       const path = joinPath(segs.slice(0, i + 1))
       let node = index.get(path)
       if (!node) {
-        node = { path, name: segs[i], depth: i + 1, children: [], fileIds: [], total: 0, isNew: !existingDirs.has(path) }
+        const abs = d.resolve.dir(segs.slice(0, i + 1))
+        node = { path, name: segs[i], depth: i + 1, children: [], fileIds: [], total: 0, isNew: !d.dirExists(abs) }
         index.set(path, node)
         parent.children.push(node)
       }
@@ -78,26 +81,31 @@ function nextFreeName(name: string, taken: Set<string>): string {
   return candidate
 }
 
+const splitAbs = (p: string) => {
+  const i = p.lastIndexOf('\\')
+  return [p.slice(0, i).toLowerCase(), p.slice(i + 1).toLowerCase()] as const
+}
+
 /** Detecta colisiones: dos archivos con el mismo nombre en un destino, o un archivo que ya existe allí. */
 export function findConflicts(d: Draft): Record<string, Conflict> {
   const out: Record<string, Conflict> = {}
   const taken = new Map<string, Set<string>>()
-  const existing = new Set(d.existing.map((p) => p.toLowerCase()))
+  const existing = new Set<string>()
   for (const p of d.existing) {
-    const segs = p.split('/')
-    const dir = joinPath(segs.slice(0, -1)).toLowerCase()
+    const [dir, name] = splitAbs(p)
+    existing.add(`${dir}\\${name}`)
     if (!taken.has(dir)) taken.set(dir, new Set())
-    taken.get(dir)!.add(segs[segs.length - 1].toLowerCase())
+    taken.get(dir)!.add(name)
   }
   for (const f of d.files) {
     if (d.excluded[f.id] || !d.plan[f.id]) continue
-    const dir = joinPath(d.plan[f.id].dest).toLowerCase()
+    const dir = d.resolve.dir(d.plan[f.id].dest).toLowerCase()
     const names = taken.get(dir) ?? new Set<string>()
     taken.set(dir, names)
     const key = f.name.toLowerCase()
     if (names.has(key)) {
       const renameTo = nextFreeName(f.name, names)
-      out[f.id] = { fileId: f.id, kind: existing.has(`${dir}/${key}`) ? 'exists' : 'same-name', renameTo }
+      out[f.id] = { fileId: f.id, kind: existing.has(`${dir}\\${key}`) ? 'exists' : 'same-name', renameTo }
       names.add(renameTo.toLowerCase())
     } else {
       names.add(key)
@@ -116,11 +124,10 @@ export function buildPlan(
   const moves: OrganizePlan['moves'] = []
   const skipped: OrganizePlan['skipped'] = []
   const folders = new Set<string>()
-  const tree = buildTree(d)
-  for (const n of flattenFolders(tree)) if (n.isNew) folders.add(n.path)
+  for (const n of flattenFolders(buildTree(d))) if (n.isNew) folders.add(d.resolve.dir(n.path.split('/')))
 
   for (const f of d.files) {
-    const from = f.relDir ? `${f.relDir}/${f.name}` : f.name
+    const from = winJoin(sourcePath, f.relDir, f.name)
     if (d.excluded[f.id]) {
       skipped.push({ fileId: f.id, name: f.name, reason: 'Excluido por el usuario' })
       continue
@@ -133,9 +140,9 @@ export function buildPlan(
       continue
     }
     const finalName = conflict ? conflict.renameTo : f.name
-    moves.push({ fileId: f.id, name: f.name, from, to: `${joinPath(c.dest)}/${finalName}`, finalName })
+    moves.push({ fileId: f.id, name: f.name, from, to: winJoin(d.resolve.dir(c.dest), finalName), finalName })
   }
-  return { sourceId, sourcePath, moves, skipped, foldersToCreate: [...folders].sort() }
+  return { sourceId, sourcePath, destinationLabel: d.resolve.label, moves, skipped, foldersToCreate: [...folders].sort() }
 }
 
 /** Renombra una carpeta reescribiendo el prefijo de todos los destinos afectados. */

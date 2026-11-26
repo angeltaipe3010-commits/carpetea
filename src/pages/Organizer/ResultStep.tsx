@@ -62,6 +62,11 @@ export default function ResultStep() {
       <p className="mt-1 text-[13.5px] text-muted">
         {operation.errors.length ? 'Terminó con algunos avisos. Nada se perdió ni se sobrescribió.' : 'Todo salió bien. Puedes deshacerlo cuando quieras desde el Historial.'}
       </p>
+      {operation.destination && (
+        <p className="mx-auto mt-2 max-w-full truncate font-mono text-[11.5px] text-faint" title={operation.destination}>
+          Guardado en {operation.destination}
+        </p>
+      )}
 
       <motion.dl variants={list} initial="initial" animate="animate" className="mt-6 grid grid-cols-3 gap-2.5 text-left max-[560px]:grid-cols-1">
         {[

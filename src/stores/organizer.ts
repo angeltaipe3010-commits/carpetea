@@ -11,7 +11,7 @@ import type {
   SourceFolder,
 } from '@/types'
 import { joinPath, renamePrefix } from '@/utils/plan'
-import { useHistory } from './history'
+import { managedWithin, useHistory } from './history'
 import { useRules } from './rules'
 import { useSettings } from './settings'
 
@@ -26,6 +26,7 @@ interface OrganizerState {
   excluded: Record<string, true>
   extraFolders: string[]
   existing: string[]
+  skippedManaged: number
   scanMs: number
   selectedPath: string
   policy: ConflictPolicy
@@ -56,6 +57,7 @@ const initial = {
   excluded: {},
   extraFolders: [],
   existing: [],
+  skippedManaged: 0,
   scanMs: 0,
   selectedPath: '',
   policy: 'rename' as ConflictPolicy,
@@ -76,6 +78,7 @@ export const useOrganizer = create<OrganizerState>((set, get) => ({
     const s = useSettings.getState()
     controller = new AbortController()
     set({ ...initial, source, step: 'scanning' })
+    const skipDirs = managedWithin(useHistory.getState().managed, source.path)
     try {
       const result = await api.scan(
         source.id,
@@ -87,6 +90,7 @@ export const useOrganizer = create<OrganizerState>((set, get) => ({
           reviewFolderName: s.reviewFolderName,
         },
         useRules.getState().rules,
+        skipDirs,
         (scan) => set({ scan }),
         controller.signal,
       )
@@ -97,6 +101,7 @@ export const useOrganizer = create<OrganizerState>((set, get) => ({
         files: result.files,
         plan,
         existing: result.existing,
+        skippedManaged: result.skippedManaged,
         scanMs: result.durationMs,
         selectedPath: '',
       })
@@ -159,6 +164,7 @@ export const useOrganizer = create<OrganizerState>((set, get) => ({
     try {
       const op = await api.execute(plan, (exec) => set({ exec }), controller.signal)
       useHistory.getState().add(op)
+      useHistory.getState().addManaged(op.foldersCreated)
       set({ step: 'done', operation: op })
     } catch (e) {
       set({ step: 'preview', error: isAbort(e) ? 'Se detuvo la organización antes de terminar.' : 'No se pudo completar la operación.' })
