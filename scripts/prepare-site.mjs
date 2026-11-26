@@ -4,8 +4,9 @@
 //   npm run tauri build
 //   npm run site
 //
-// Después basta con subir la carpeta website/ a cualquier hosting estático
-// (GitHub Pages, Netlify, Cloudflare Pages…).
+// Los botones de descarga apuntan a la Release de GitHub de esa versión
+// (gh release create v<versión> <instalador> website/downloads/SHA256SUMS.txt).
+// Al subir website/ a main, Vercel la publica (configuración en vercel.json).
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -29,6 +30,7 @@ const mb = (statSync(built).size / 1024 / 1024).toFixed(1).replace('.', ',')
 let html = readFileSync('website/index.html', 'utf8')
 html = html
   .replace(/DeskFlow_[\d.]+_x64-setup\.exe/g, file)
+  .replace(/releases\/download\/v[\d.]+\//g, `releases/download/v${version}/`)
   .replace(/(<code id="sha"[^>]*>)[0-9a-f]{64}(<\/code>)/, `$1${sha}$2`)
   .replace(/\d+,\d MB/g, `${mb} MB`)
   .replace(/Versión <b>[\d.]+<\/b>/, `Versión <b>${version}</b>`)

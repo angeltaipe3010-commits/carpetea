@@ -69,10 +69,13 @@ Página de presentación con el botón de descarga. Es estática (HTML, CSS y JS
 
 ```bash
 npm run tauri build   # genera el instalador
-npm run site          # lo copia a website/downloads y actualiza versión, tamaño y SHA-256 en la página
+npm run site          # actualiza versión, tamaño, SHA-256 y enlace de la Release en la página
+gh release create v1.0.0 src-tauri/target/release/bundle/nsis/DeskFlow_1.0.0_x64-setup.exe website/downloads/SHA256SUMS.txt
 ```
 
-Después se sube la carpeta `website/` a cualquier hosting estático (GitHub Pages, Netlify, Cloudflare Pages…). El `.exe` no se guarda en git (`website/downloads/*.exe`). Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
+Los botones de descarga apuntan al instalador de la [Release de GitHub](https://github.com/angeltaipe3010-commits/deskflow/releases) y el `.exe` no se guarda en git (`website/downloads/*.exe`). La web se despliega en Vercel: `vercel.json` le indica que sirva `website/` tal cual (sin instalar dependencias ni compilar), así que basta con importar el repositorio en Vercel y cada push a `main` la publica. Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
+
+**Descarga:** [última versión](https://github.com/angeltaipe3010-commits/deskflow/releases/latest).
 
 ## Licencia
 
