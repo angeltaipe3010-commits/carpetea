@@ -28,7 +28,16 @@ export default function History() {
   const runUndo = async () => {
     if (!undoing) return
     setProgress({ done: 0, total: 1, current: '' })
-    const result = await api.undo(undoing, setProgress)
+    let result: Operation
+    try {
+      result = await api.undo(undoing, setProgress)
+    } catch (e) {
+      // Sin esto el diálogo quedaría bloqueado para siempre.
+      setProgress(null)
+      setUndoing(null)
+      toast({ tone: 'danger', title: 'No se pudo deshacer', description: e instanceof Error ? e.message : String(e) })
+      return
+    }
     replace(result)
     // Lo deshecho ya no cuenta como organizado: se analizará de nuevo.
     removeManaged(undoing.foldersCreated)
@@ -39,7 +48,7 @@ export default function History() {
     toast({
       tone: pending ? 'warning' : 'success',
       title: `${plural(restored, 'archivo restaurado', 'archivos restaurados')}`,
-      description: pending ? `${plural(pending, 'archivo se dejó', 'archivos se dejaron')} donde está porque cambió después de organizarlo.` : 'Todo volvió a su ubicación original.',
+      description: pending ? `${plural(pending, 'archivo se quedó', 'archivos se quedaron')} donde estaba: cambió, se movió o su sitio original está ocupado. Mira el detalle en el historial.` : 'Todo volvió a su ubicación original.',
     })
   }
 

@@ -37,6 +37,8 @@ const DOWNLOADS_SEED: Seed[] = [
   ['Clase_Administracion_Finanzas.pptx', 6420, '2026-10-08'],
   ['Silabo_Contabilidad_General_2026.pdf', 512, '2026-03-10'],
   ['Trabajo_Final_Marketing_Digital.docx', 1820, '2026-07-04'],
+  ['DESARROLLO-DE-APLICACIONES-WEB-I-T1-T5FO-PEREZ-QUISPE.docx', 488, '2026-10-20'],
+  ['DESARROLLO-DE-APLICACIONES-WEB-I-T2-T5FO-PEREZ-QUISPE.pdf', 910, '2026-11-17'],
   ['Notas.txt', 2, '2026-11-22'],
   ['documento.pdf', 340, '2026-05-17'],
   ['scan0001.pdf', 3120, '2026-04-02'],

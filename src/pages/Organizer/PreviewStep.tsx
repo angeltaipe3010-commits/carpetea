@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react'
+import { folderNameProblem } from '@/utils/names'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  ArrowLeft,
   ArrowRight,
   ChevronRight,
   CircleExclamationPoint,
   Cloud,
   CornerDownRight,
   EyeOff,
+  FolderCheck,
   FolderInput,
   FolderOpen,
   FolderPlus,
   Info,
+  LoaderCircle,
   FolderSync,
   Hand,
   RotateCcw,
@@ -21,7 +25,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { EmptyState, Input, Label, Panel, Segmented, Select } from '@/components/ui/primitives'
+import { Badge, EmptyState, Input, Label, Panel, Segmented, Select } from '@/components/ui/primitives'
 import { FolderTree, DRAG_MIME } from '@/components/folders/FolderTree'
 import { DestinationField, destinationCloud, destinationReady } from '@/components/folders/DestinationField'
 import { useDraft } from '@/hooks/useDraft'
@@ -32,11 +36,14 @@ import { ease } from '@/lib/motion'
 import { useOrganizer } from '@/stores/organizer'
 import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/toasts'
-import type { Confidence, Conflict, FileEntry } from '@/types'
-import { baseName } from '@/utils/destination'
+import type { Classification, Confidence, Conflict, FileEntry } from '@/types'
+import { baseName, structureRoots } from '@/utils/destination'
+import { api } from '@/services/api'
+import { librariesOf, useEnv } from '@/stores/env'
 import { buildPlan, buildTree, findConflicts, flattenFolders, joinPath } from '@/utils/plan'
 
 type Filter = 'all' | Confidence | 'conflicts' | 'excluded'
+const PAGE = 300
 
 export default function PreviewStep() {
   const o = useOrganizer()
@@ -44,11 +51,63 @@ export default function PreviewStep() {
   const destination = useSettings((s) => s.destination)
   const setSettings = useSettings((s) => s.set)
   const [changingDest, setChangingDest] = useState(false)
+  const useStructure = useSettings((s) => s.useStructure)
+  const env = useEnv((s) => s.env)
+
+  // Permiso del motor sobre el destino. Sin él, organizar fallaría archivo por archivo.
+  const destRoots = useMemo(
+    () => (o.source ? structureRoots(destination, o.source.path, librariesOf(env)).map((r) => r.root) : []),
+    [destination, o.source, env],
+  )
+  const [missing, setMissing] = useState<string[] | null>(null)
+  const checkAccess = async () => {
+    const ok = await api.checkAccess(destRoots)
+    setMissing(destRoots.filter((_, i) => !ok[i]))
+  }
+  useEffect(() => {
+    void checkAccess()
+  }, [destRoots.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const regrant = async (path: string) => {
+    try {
+      const picked = await api.pickFolder(`Vuelve a elegir ${baseName(path)} para dar permiso a DeskFlow`, path)
+      if (!picked) return
+      if (picked.problem) return toast({ tone: 'danger', title: 'No se puede usar esa carpeta', description: picked.problem })
+      if (picked.path.toLowerCase() !== path.toLowerCase()) {
+        // Eligió otra carpeta: pasa a ser el destino (y si está en la nube, se pedirá confirmación).
+        setSettings({ destination: { mode: 'custom', customPath: picked.path, cloudProvider: picked.cloud, allowCloud: false } })
+      }
+      await checkAccess()
+      void o.applyStructure()
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudo abrir el selector', description: e instanceof Error ? e.message : String(e) })
+    }
+  }
+  const accessOk = missing !== null && missing.length === 0
+
+  // Al cambiar el destino o la opción, se vuelve a aprender la estructura (el análisis ya lo hizo la primera vez).
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    void o.applyStructure()
+  }, [destination, useStructure]) // eslint-disable-line react-hooks/exhaustive-deps
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [checked, setChecked] = useState<Record<string, true>>({})
   const [dragging, setDragging] = useState(false)
   const [newFolderIn, setNewFolderIn] = useState<string | null>(null)
+  // Volver a analizar o cambiar de carpeta descarta lo que el usuario cambió a mano.
+  const [discard, setDiscard] = useState<null | 'rescan' | 'source'>(null)
+  const edited = Object.keys(o.manual).length + Object.keys(o.excluded).length + o.extraFolders.length > 0
+  const runDiscard = (what: 'rescan' | 'source') => {
+    setDiscard(null)
+    if (what === 'rescan') void o.startScan()
+    else o.reset()
+  }
+  const askDiscard = (what: 'rescan' | 'source') => (edited ? setDiscard(what) : runDiscard(what))
   const [confirming, setConfirming] = useState(false)
 
   const draft = useDraft()
@@ -71,6 +130,7 @@ export default function PreviewStep() {
   }, [o.files, o.plan, o.excluded, conflicts])
 
   const newFolders = folders.filter((f) => f.isNew).length
+  const inYours = o.files.filter((f) => !o.excluded[f.id] && o.plan[f.id]?.via && o.plan[f.id].via !== 'course').length
 
   // Archivos visibles: subárbol seleccionado + filtro + búsqueda.
   const visible = useMemo(() => {
@@ -88,7 +148,30 @@ export default function PreviewStep() {
     })
   }, [o.files, o.excluded, o.plan, o.selectedPath, filter, query, conflicts])
 
-  const checkedIds = Object.keys(checked).filter((id) => visible.some((f) => f.id === id))
+  const checkedIds = useMemo(() => visible.filter((f) => checked[f.id]).map((f) => f.id), [visible, checked])
+  // La lista se pinta por tandas: miles de filas a la vez bloquean la interfaz.
+  // La tanda vuelve a empezar al cambiar de vista (filtro, búsqueda o carpeta).
+  const viewKey = `${filter}|${query}|${o.selectedPath}`
+  const [page, setPage] = useState({ key: viewKey, n: PAGE })
+  const limit = page.key === viewKey ? page.n : PAGE
+  const showMore = () => setPage({ key: viewKey, n: limit + PAGE })
+  const shown = visible.length > limit ? visible.slice(0, limit) : visible
+  const checkedRef = useRef(checkedIds)
+  useEffect(() => {
+    checkedRef.current = checkedIds
+  }, [checkedIds])
+  const onCheck = useCallback(
+    (id: string) =>
+      setChecked((s) => {
+        const n = { ...s }
+        if (n[id]) delete n[id]
+        else n[id] = true
+        return n
+      }),
+    [],
+  )
+  const dragIdsFor = useCallback((id: string) => (checkedRef.current.includes(id) ? checkedRef.current : [id]), [])
+  const goTo = o.select
   const allChecked = visible.length > 0 && checkedIds.length === visible.length
 
   const moveTo = (ids: string[], path: string) => {
@@ -106,6 +189,23 @@ export default function PreviewStep() {
       <Panel className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3.5">
         <Stat label="Archivos" value={formatNumber(counts.all)} />
         <Stat label="Carpetas nuevas" value={formatNumber(newFolders)} />
+        {o.structure.status !== 'off' && (
+          <div title={o.structure.error}>
+            <div className="text-[11.5px] text-faint">En tus carpetas</div>
+            <div className="flex items-center gap-1.5 text-[15px] font-semibold text-text tabular-nums">
+              {o.structure.status === 'loading' ? (
+                <>
+                  <LoaderCircle className="size-3.5 animate-spin text-primary" />
+                  <span className="text-[12.5px] font-normal text-muted">Aprendiendo…</span>
+                </>
+              ) : o.structure.status === 'error' ? (
+                <span className="text-[12.5px] font-normal text-danger">No disponible</span>
+              ) : (
+                formatNumber(inYours)
+              )}
+            </div>
+          </div>
+        )}
         <Stat label="Analizado en" value={formatDuration(o.scanMs)} />
         <button
           type="button"
@@ -126,14 +226,44 @@ export default function PreviewStep() {
           <span className="text-[12px] text-primary opacity-0 transition-opacity group-hover:opacity-100">Cambiar</span>
         </button>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" icon={RotateCcw} onClick={o.startScan}>
+          <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => askDiscard('source')}>
+            Cambiar carpeta
+          </Button>
+          <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => askDiscard('rescan')}>
             Volver a analizar
           </Button>
-          <Button variant="primary" iconRight={ArrowRight} onClick={() => setConfirming(true)} disabled={counts.all === 0 || !destinationReady(destination)}>
+          <Button variant="primary" iconRight={ArrowRight} onClick={() => setConfirming(true)} disabled={counts.all === 0 || !destinationReady(destination) || !accessOk}>
             Revisar y confirmar
           </Button>
         </div>
       </Panel>
+
+      {missing && missing.length > 0 && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3">
+          <CircleExclamationPoint className="size-4 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1 text-[13px] text-text">
+            <span className="font-medium">DeskFlow no tiene permiso para usar {missing.map((m) => baseName(m)).join(', ')}.</span>{' '}
+            <span className="text-muted">Por seguridad solo usa carpetas que eliges en el selector de Windows. Vuelve a elegirla para continuar.</span>
+          </div>
+          {missing.map((m) => (
+            <Button key={m} size="sm" variant="primary" icon={FolderOpen} onClick={() => regrant(m)}>
+              Elegir {baseName(m)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {accessOk && o.structure.status === 'error' && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
+          <CircleExclamationPoint className="size-4 shrink-0 text-danger" />
+          <div className="min-w-0 flex-1 text-[13px] text-text">
+            <span className="font-medium">No se pudo leer la estructura de tu destino.</span> <span className="text-muted">{o.structure.error}</span>
+          </div>
+          <Button size="sm" icon={RotateCcw} onClick={() => void o.applyStructure()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
 
       {o.skippedManaged > 0 && (
         <p className="mb-4 flex items-center gap-2 px-1 text-[12.5px] text-muted">
@@ -223,7 +353,9 @@ export default function PreviewStep() {
                 ['conflicts', 'Conflictos', counts.conflicts],
                 ['excluded', 'Excluidos', counts.excluded],
               ] as [Filter, string, number][]
-            ).map(([key, label, n]) => (
+            )
+              .filter(([key, , n]) => !((key === 'conflicts' || key === 'excluded') && n === 0 && filter !== key))
+              .map(([key, label, n]) => (
               <button
                 key={key}
                 type="button"
@@ -232,7 +364,6 @@ export default function PreviewStep() {
                 className={cn(
                   'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium transition-colors duration-150',
                   filter === key ? 'border-primary/30 bg-primary-soft text-primary' : 'border-border text-muted hover:border-border-strong hover:text-text',
-                  (key === 'conflicts' || key === 'excluded') && n === 0 && filter !== key && 'hidden',
                 )}
               >
                 {label}
@@ -266,19 +397,17 @@ export default function PreviewStep() {
                       </option>
                     ))}
                   </Select>
-                  {filter !== 'excluded' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={EyeOff}
-                      onClick={() => {
-                        checkedIds.forEach(o.toggleExclude)
-                        setChecked({})
-                      }}
-                    >
-                      Excluir
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={filter === 'excluded' ? Undo2 : EyeOff}
+                    onClick={() => {
+                      o.setExcluded(checkedIds, filter !== 'excluded')
+                      setChecked({})
+                    }}
+                  >
+                    {filter === 'excluded' ? 'Incluir' : 'Excluir'}
+                  </Button>
                   <Button size="sm" variant="ghost" icon={X} className="ml-auto" onClick={() => setChecked({})}>
                     Limpiar
                   </Button>
@@ -313,27 +442,32 @@ export default function PreviewStep() {
                 }
               />
             ) : (
-              <ul>
-                {visible.map((f) => (
-                  <FileRow
-                    key={f.id}
-                    file={f}
-                    checked={!!checked[f.id]}
-                    onCheck={() =>
-                      setChecked((s) => {
-                        const n = { ...s }
-                        if (n[f.id]) delete n[f.id]
-                        else n[f.id] = true
-                        return n
-                      })
-                    }
-                    onDragState={setDragging}
-                    dragIds={checked[f.id] ? checkedIds : [f.id]}
-                    onGoTo={(p) => o.select(p)}
-                    cf={conflicts[f.id]}
-                  />
-                ))}
-              </ul>
+              <>
+                <ul>
+                  {shown.map((f) => (
+                    <FileRow
+                      key={f.id}
+                      file={f}
+                      c={o.plan[f.id]}
+                      isExcluded={!!o.excluded[f.id]}
+                      checked={!!checked[f.id]}
+                      onCheck={onCheck}
+                      onDragState={setDragging}
+                      dragIdsFor={dragIdsFor}
+                      onGoTo={goTo}
+                      cf={conflicts[f.id]}
+                    />
+                  ))}
+                </ul>
+                {visible.length > shown.length && (
+                  <div className="flex items-center justify-center gap-3 border-t border-border px-4 py-3 text-[12.5px] text-muted">
+                    Mostrando {formatNumber(shown.length)} de {formatNumber(visible.length)}
+                    <Button size="sm" onClick={showMore}>
+                      Mostrar {formatNumber(Math.min(PAGE, visible.length - shown.length))} más
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </Panel>
@@ -351,6 +485,29 @@ export default function PreviewStep() {
         }
       >
         <DestinationField value={destination} onChange={(d) => setSettings({ destination: d })} sourceName={o.source?.name} />
+      </Dialog>
+
+      <Dialog
+        open={discard !== null}
+        onClose={() => setDiscard(null)}
+        title="¿Descartar tus cambios?"
+        description="Se perderán las carpetas que moviste, renombraste o creaste y los archivos que excluiste en esta vista previa. No se toca ningún archivo."
+        width="sm"
+        footer={
+          <>
+            <Button onClick={() => setDiscard(null)} data-autofocus>
+              Seguir editando
+            </Button>
+            <Button variant="danger" onClick={() => discard && runDiscard(discard)}>
+              {discard === 'source' ? 'Descartar y cambiar carpeta' : 'Descartar y volver a analizar'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-muted">
+          {plural(Object.keys(o.manual).length, 'archivo reasignado', 'archivos reasignados')} ·{' '}
+          {plural(Object.keys(o.excluded).length, 'excluido', 'excluidos')} · {plural(o.extraFolders.length, 'carpeta nueva', 'carpetas nuevas')}
+        </p>
       </Dialog>
 
       <NewFolderDialog
@@ -393,26 +550,28 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function FileRow({
+const FileRow = memo(function FileRow({
   file,
+  c,
+  isExcluded,
   checked,
   onCheck,
   onDragState,
-  dragIds,
+  dragIdsFor,
   onGoTo,
   cf,
 }: {
   file: FileEntry
+  c: Classification
+  isExcluded: boolean
   cf?: Conflict
   checked: boolean
-  onCheck: () => void
+  onCheck: (id: string) => void
   onDragState: (v: boolean) => void
-  dragIds: string[]
+  dragIdsFor: (id: string) => string[]
   onGoTo: (path: string) => void
 }) {
-  const { plan, excluded, toggleExclude } = useOrganizer()
-  const c = plan[file.id]
-  const isExcluded = !!excluded[file.id]
+  const toggleExclude = useOrganizer((s) => s.toggleExclude)
   const [isDragging, setIsDragging] = useState(false)
   const dest = joinPath(c.dest)
 
@@ -420,7 +579,7 @@ function FileRow({
     <li
       draggable={!isExcluded}
       onDragStart={(e) => {
-        e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIds))
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIdsFor(file.id)))
         e.dataTransfer.effectAllowed = 'move'
         setIsDragging(true)
         onDragState(true)
@@ -436,7 +595,7 @@ function FileRow({
         !isExcluded && 'cursor-grab active:cursor-grabbing',
       )}
     >
-      <input type="checkbox" checked={checked} onChange={onCheck} aria-label={`Seleccionar ${file.name}`} className="size-3.5 accent-[var(--df-primary)]" />
+      <input type="checkbox" checked={checked} onChange={() => onCheck(file.id)} aria-label={`Seleccionar ${file.name}`} className="size-3.5 accent-[var(--df-primary)]" />
       <FileIcon category={c.category} ext={file.ext} className={cn(isExcluded && 'opacity-50')} />
       <div className="min-w-0 flex-1">
         <div className={cn('truncate text-[13px] text-text', isExcluded && 'text-faint line-through')} title={file.name}>
@@ -465,11 +624,21 @@ function FileRow({
           </div>
         )}
       </div>
-      <div className="flex w-[150px] items-center justify-end gap-1 max-[1100px]:w-auto">
+      <div className="flex min-w-[150px] shrink-0 items-center justify-end gap-1 max-[1100px]:min-w-0">
         {file.relDir && !isExcluded && (
           <span className="mr-1 truncate text-[11px] text-faint max-[1300px]:hidden" title={`Origen: ${file.relDir}`}>
             desde {file.relDir}
           </span>
+        )}
+        {!isExcluded && c.via === 'structure' && (
+          <Badge tone="primary" icon={FolderCheck} className="max-[1200px]:hidden">
+            Tu carpeta
+          </Badge>
+        )}
+        {!isExcluded && c.via === 'course' && (
+          <Badge tone="primary" icon={FolderPlus} className="max-[1200px]:hidden">
+            Curso nuevo
+          </Badge>
         )}
         {!isExcluded && <ConfidenceBadge value={c.confidence} compact />}
         <Button
@@ -484,7 +653,7 @@ function FileRow({
       </div>
     </li>
   )
-}
+})
 
 function NewFolderDialog({
   parent,
@@ -498,20 +667,21 @@ function NewFolderDialog({
   onCreate: (name: string) => void
 }) {
   const [name, setName] = useState('')
-  const invalid = /[\\/:*?"<>|]/.test(name)
+  const invalid = name.trim() !== '' && folderNameProblem(name) !== null
+  const close = () => {
+    setName('')
+    onClose()
+  }
   return (
     <Dialog
       open={parent !== null}
-      onClose={() => {
-        setName('')
-        onClose()
-      }}
+      onClose={close}
       title="Nueva carpeta"
       description={`Se creará dentro de ${parent ? parent : rootName}.`}
       width="sm"
       footer={
         <>
-          <Button onClick={onClose}>Cancelar</Button>
+          <Button onClick={close}>Cancelar</Button>
           <Button
             variant="primary"
             icon={FolderPlus}
@@ -537,7 +707,7 @@ function NewFolderDialog({
       >
         <Label htmlFor="folder-name">Nombre</Label>
         <Input id="folder-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Universidad" aria-invalid={invalid} />
-        {invalid && <p className="mt-1.5 text-[12px] text-danger">Windows no permite estos caracteres: \ / : * ? " &lt; &gt; |</p>}
+        {invalid && <p className="mt-1.5 text-[12px] text-danger">{folderNameProblem(name)}</p>}
       </form>
     </Dialog>
   )

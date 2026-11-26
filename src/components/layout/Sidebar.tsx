@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { spring } from '@/lib/motion'
 import { useSettings } from '@/stores/settings'
 import { useResolvedTheme } from '@/hooks/useTheme'
+import { isNative } from '@/services/api'
 
 const NAV: { to: string; label: string; hint: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Inicio', hint: 'Resumen y actividad', icon: House },
@@ -46,10 +47,12 @@ export function Sidebar() {
       </nav>
 
       <div className="flex flex-col gap-0.5 px-2.5 pb-3">
-        <div className="mx-1.5 mb-2 rounded-lg border border-dashed border-border-strong px-2.5 py-2 max-[900px]:hidden">
-          <p className="text-[11.5px] font-medium text-text">Modo prototipo</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-faint">Datos simulados. Ningún archivo real se mueve.</p>
-        </div>
+        {!isNative && (
+          <div className="mx-1.5 mb-2 rounded-lg border border-dashed border-border-strong px-2.5 py-2 max-[900px]:hidden">
+            <p className="text-[11.5px] font-medium text-text">Modo prototipo</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-faint">Datos simulados. Ningún archivo real se mueve.</p>
+          </div>
+        )}
         <NavItem
           to="/configuracion"
           label="Configuración"

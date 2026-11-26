@@ -1,3 +1,4 @@
+import { folderNameProblem } from '@/utils/names'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { Lock, Monitor, Moon, Plus, Sun, X } from 'lucide-react'
@@ -73,6 +74,9 @@ export default function Settings() {
               <span className="w-16 text-[13px] font-medium text-text tabular-nums">{s.maxDepth} niveles</span>
             </div>
           </Row>
+          <Row label="Usar mi estructura existente" hint="Antes de crear carpetas, busca en el destino una carpeta tuya que coincida (por ejemplo, la de tu curso) y reutiliza las que ya tienes.">
+            <Switch checked={s.useStructure} onChange={(v) => s.set({ useStructure: v })} label="Usar mi estructura existente" />
+          </Row>
           <Row label="Subcarpetas por año" hint="Agrupa facturas, estudios y fotos por año.">
             <Switch checked={s.yearSubfolders} onChange={(v) => s.set({ yearSubfolders: v })} label="Subcarpetas por año" />
           </Row>
@@ -84,7 +88,7 @@ export default function Settings() {
               aria-label="Nombre de la carpeta para revisar"
               value={s.reviewFolderName}
               onChange={(e) => s.set({ reviewFolderName: e.target.value.replace(/[\\/:*?"<>|]/g, '') })}
-              onBlur={(e) => !e.target.value.trim() && s.set({ reviewFolderName: 'Por revisar' })}
+              onBlur={(e) => folderNameProblem(e.target.value) && s.set({ reviewFolderName: 'Por revisar' })}
               className="w-44"
             />
           </Row>

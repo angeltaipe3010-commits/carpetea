@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { ease } from '@/lib/motion'
-import { cloudLibraries, LIBRARY_LABEL, localFs } from '@/services/localFs'
+import { api, isNative } from '@/services/api'
+import { LIBRARY_LABEL } from '@/services/localFs'
+import { cloudLibrariesOf, librariesOf, useEnv } from '@/stores/env'
 import { toast } from '@/stores/toasts'
 import type { Destination, DestinationMode } from '@/types'
 import { baseName, cloudProvider, destinationProblem } from '@/utils/destination'
@@ -15,10 +17,10 @@ import { FolderPicker } from './FolderPicker'
 /** Proveedores de nube que afectan a un destino (vacío = todo local). */
 export function destinationCloud(d: Destination): string[] {
   if (d.mode === 'custom') {
-    const p = d.customPath ? cloudProvider(d.customPath) : null
+    const p = d.cloudProvider ?? (d.customPath ? cloudProvider(d.customPath) : null)
     return p ? [p] : []
   }
-  if (d.mode === 'libraries') return [...new Set(cloudLibraries().map((c) => c.provider))]
+  if (d.mode === 'libraries') return [...new Set(cloudLibrariesOf(useEnv.getState().env).map((c) => c.provider))]
   return []
 }
 
@@ -41,8 +43,9 @@ export function DestinationField({
   const [picking, setPicking] = useState(false)
   // Destino pendiente de confirmar porque toca la nube.
   const [pending, setPending] = useState<{ dest: Destination; target: CloudTarget } | null>(null)
-  const libs = localFs.libraries()
-  const cloudLibs = cloudLibraries()
+  const env = useEnv((s) => s.env)
+  const libs = librariesOf(env)
+  const cloudLibs = cloudLibrariesOf(env)
   const customProblem = value.customPath ? destinationProblem(value.customPath) : null
   const cloud = destinationCloud(value)
   const where = sourceName ?? 'la carpeta que organices'
@@ -61,8 +64,15 @@ export function DestinationField({
     onChange(dest)
   }
 
-  const applyLocalDocuments = () => {
-    const { path, created } = localFs.findOrCreateLocalDocuments()
+  const applyLocalDocuments = async () => {
+    let result: { path: string; created: boolean }
+    try {
+      result = await api.localDocuments()
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudo preparar una carpeta local', description: e instanceof Error ? e.message : String(e) })
+      return
+    }
+    const { path, created } = result
     onChange({ mode: 'custom', customPath: path, allowCloud: false })
     toast({
       tone: 'success',
@@ -71,10 +81,23 @@ export function DestinationField({
     })
   }
 
+  /** En escritorio, el selector nativo de Windows; en el navegador, el simulado. */
+  const openPicker = async () => {
+    if (!isNative) return setPicking(true)
+    try {
+      const picked = await api.pickFolder('Elegir carpeta de destino', value.customPath || undefined)
+      if (!picked) return
+      if (picked.problem) return toast({ tone: 'danger', title: 'No se puede usar esa carpeta', description: picked.problem })
+      request({ mode: 'custom', customPath: picked.path, cloudProvider: picked.cloud })
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudo abrir el selector', description: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
   const setMode = (mode: DestinationMode) => {
     if (mode === 'custom') {
-      if (value.customPath) request({ mode, customPath: value.customPath })
-      else setPicking(true)
+      if (value.customPath) request({ mode, customPath: value.customPath, cloudProvider: value.cloudProvider })
+      else openPicker()
       return
     }
     request({ mode, customPath: value.customPath })
@@ -177,7 +200,7 @@ export function DestinationField({
                     <div className="text-[13px] text-faint">Ninguna carpeta elegida</div>
                   )}
                 </div>
-                <Button size="sm" onClick={() => setPicking(true)}>
+                <Button size="sm" onClick={openPicker}>
                   {value.customPath ? 'Cambiar' : 'Elegir…'}
                 </Button>
               </div>

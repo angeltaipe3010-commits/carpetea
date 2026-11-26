@@ -4,7 +4,49 @@
 
 DeskFlow es un organizador inteligente de archivos para escritorio (Windows primero). Analiza una carpeta, propone una estructura de carpetas y subcarpetas según su contenido real y no mueve nada hasta que el usuario lo confirma. Todo funciona en local.
 
-> **Estado: Fase 1 — prototipo navegable.** La interfaz está completa y funciona con **datos simulados**. Ningún archivo real se lee ni se mueve. La integración con Tauri 2 y Rust empieza en la Fase 2.
+> **Estado: Fase 2 — app de escritorio con motor real.** Dentro de la app de escritorio (Tauri 2 + Rust), DeskFlow analiza, organiza y deshace operaciones sobre **carpetas reales**. En el navegador (`npm run dev`) sigue funcionando el prototipo con datos simulados. Duplicados y monitoreo todavía no están en la versión de escritorio y la interfaz lo indica.
+
+## App de escritorio
+
+Requisitos en Windows: Node.js 20+, [Rust](https://rustup.rs) (toolchain MSVC), Visual Studio Build Tools con C++ y WebView2 (incluido en Windows 11).
+
+```bash
+npm install
+npm run tauri dev      # abre la ventana de DeskFlow con el motor real
+npm run tauri build    # genera los instaladores (NSIS y MSI) en src-tauri/target/release/bundle
+cd src-tauri && cargo test   # pruebas del motor en carpetas temporales
+npm run test:e2e       # QA de la app de escritorio real (Playwright)
+```
+
+### QA de la app de escritorio (`e2e/desktop`)
+
+Playwright se conecta a la ventana real de DeskFlow por CDP (WebView2 lo permite en Windows), así que las pruebas usan el motor de Rust y el disco de verdad:
+- El fixture crea una carpeta aislada en `e2e/.sandbox/`, con un *Origen* de descargas falsas y un *Destino* con estructura propia.
+- Arranca una **segunda instancia** de la compilación de depuración, con base de datos y perfil de WebView2 propios, y la borra al terminar (`DESKFLOW_E2E_KEEP=1` para conservarla).
+- Nunca toca tus carpetas ni tu historial: con `DESKFLOW_E2E_ROOT` el motor queda **encerrado** en la carpeta de pruebas y rechaza cualquier otra ruta. Los ganchos `DESKFLOW_E2E_ROOT` y `DESKFLOW_DATA_DIR` solo existen en compilaciones de depuración.
+- `regressions.spec.ts` fija los fallos que encontró el QA exploratorio (doble clic al confirmar, carpetas «..», foco de los diálogos, descartar cambios). Los specs exploratorios del agente tester viven en `e2e/.explore/` (fuera de git): `npx playwright test -c e2e/.explore/playwright.config.ts`.
+- Requiere `src-tauri/target/debug/deskflow.exe` (lo genera `npm run tauri dev`).
+
+Cubre, por orden de riesgo:
+- No sobrescribir.
+- Archivos en uso o modificados tras el análisis.
+- Deshacer completo.
+- Destinos sin permiso o en la nube.
+- "Usar mi estructura" y cursos nuevos.
+
+### Motor (`src-tauri/src`)
+
+| Módulo | Qué hace |
+|---|---|
+| `lib.rs` | Comandos Tauri: `environment`, `list_suggested_folders`, `pick_folder`, `probe_dirs`, `local_documents`, `scan`, `cancel`, `execute`, `undo`, `history` |
+| `scanner.rs` | Recorre el origen leyendo solo metadatos. Omite ocultos, exclusiones, carpetas del sistema, descargas en curso y carpetas ya organizadas. Progreso por canal y cancelación |
+| `classifier.rs` | Port fiel de `src/services/classifier.ts`, con pruebas sobre los mismos casos |
+| `fsops.rs` | Mover sin sobrescribir nunca (`MoveFileExW` sin `REPLACE_EXISTING`). Entre unidades: copia a temporal, verifica tamaño, renombra y solo entonces borra el original |
+| `organizer.rs` | Ejecuta el plan confirmado y deshace. Solo mueve archivos del último análisis que no hayan cambiado; deshacer verifica tamaño y fecha antes de devolver cada archivo y retira las carpetas creadas que quedan vacías |
+| `db.rs` | Diario en SQLite (`deskflow.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas |
+| `safety.rs` | Detección de nube (raíces de OneDrive del sistema, nombres de clientes y atributos de archivos en la nube), rutas del sistema y carpetas autorizadas |
+
+**Permisos:** la interfaz no tiene acceso al disco (ningún plugin de sistema de archivos). Rust solo opera en carpetas elegidas en el selector nativo o sugeridas por la app (Descargas, Escritorio, bibliotecas), y rechaza las del sistema y `AppData`.
 
 ---
 
@@ -59,6 +101,18 @@ Las preferencias, reglas e historial del prototipo se guardan en `localStorage`.
 - **Escenario simulado:** el prototipo imita un Windows 11 con la copia de seguridad de OneDrive activada (Documentos e Imágenes en OneDrive, sin carpeta Documentos local), para que se pueda probar el flujo completo.
 - **No reorganiza lo ya ordenado:** DeskFlow recuerda las carpetas que creó y las omite al volver a analizar el origen. Si deshaces una operación, esas carpetas vuelven a analizarse.
 
+**Usar mi estructura** (activado por defecto; se puede desactivar en Organizar o en Configuración). Antes de proponer, DeskFlow lee la estructura del destino (solo nombres) y decide en este orden:
+1. **Reglas.** Tienen prioridad, pero su destino se encaja en tus carpetas equivalentes (por ejemplo, `Documentos/Finanzas/Facturas` pasa a tu `Finanzas/Recibos y facturas`).
+2. **Tus carpetas.** Busca la carpeta existente que mejor coincide con el nombre del archivo:
+   - Usa las palabras del nombre de la carpeta, ponderadas por rareza: "orientada" pesa más que "cibertec".
+   - Reconoce siglas ("POO", "POOII" → *Programacion Orientada a Objetos*).
+   - Tiene en cuenta las palabras que se repiten en los archivos que ya contiene. Las que aparecen en muchas carpetas, como tu nombre, apenas cuentan.
+   - En la vista previa se marca con **Tu carpeta**.
+3. **Cursos nuevos.** Si el nombre es de un trabajo académico (el curso va seguido de `T1`, una sección como `T5FO`, `PC1`, `EF`, `Semana`, `Unidad`…) y no existe carpeta para ese curso, se crea dentro de tu `Estudios` copiando tu formato (`Cibertec - Desarrollo de Aplicaciones Web I`). Todos los trabajos del mismo curso van a esa carpeta. Se marca con **Curso nuevo**.
+4. **Categorías encajadas.** Si nada coincide, la categoría normal se coloca en tus carpetas equivalentes (`Estudios`, `Videos/Grabaciones de pantalla`) e incluso en subcarpetas por tipo (`Documentos/Word`, `/PDF`), en lugar de crear carpetas paralelas.
+
+No se usan como destino las carpetas de proyectos de código (con `package.json`, `.git`…), las de programas (`IISExpress`, apps portables) ni *Por revisar*. Tampoco se mete un archivo en una rama de otro tipo (un `.csv` en `Videos/…`) salvo coincidencia clara. Lo que colocas a mano en la vista previa no se recalcula al cambiar el destino. La lógica está en `src/utils/structure.ts` y el índice de carpetas en `index_tree` (Rust).
+
 **Simulado a propósito:** el análisis, los movimientos y el deshacer se ejecutan en memoria con tiempos ficticios (`src/services/api.ts`). La simulación incluye un archivo bloqueado (`DiscordSetup.exe`) y un archivo modificado al deshacer, para mostrar cómo se informan los errores.
 
 **Señalado como no disponible:** elegir otra carpeta con el selector nativo de Windows, monitoreo de carpetas, IA opcional e idioma inglés.
@@ -111,9 +165,11 @@ src/
 
 ## Pendiente y riesgos
 
-- **Selector y detección de nube reales:** el selector del prototipo recorre un sistema de archivos simulado (`services/localFs.ts`). En la Fase 2 se usará el diálogo nativo (`@tauri-apps/plugin-dialog`), y Rust detectará la sincronización: por nombre (`utils/destination.ts`) y con los atributos de Windows de archivos en la nube (`FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, Cloud Files API). Las bibliotecas saldrán de `SHGetKnownFolderPath`, que revela si están redirigidas a OneDrive. El aviso y la carpeta Documentos local de respaldo (`findOrCreateLocalDocuments`) funcionarán igual.
-- **Rust no está instalado en este equipo.** Es necesario para la Fase 2 (`rustup`, y Visual Studio Build Tools con C++ en Windows).
-- **Arrastrar y soltar con Tauri en Windows:** con `dragDropEnabled: true` (valor por defecto), Tauri intercepta los eventos y el arrastre HTML5 interno deja de funcionar. Habrá que poner `dragDropEnabled: false` en la ventana y usar el evento de Tauri solo para soltar carpetas del sistema.
+- **Pendiente de probar a mano en la app de escritorio:** el motor tiene 16 pruebas automáticas que pasan, pero el flujo completo dentro de la ventana nativa (selector de Windows, análisis de una carpeta real, deshacer) aún no se ha recorrido. Conviene probarlo primero con una carpeta de prueba.
+- **Reglas y preferencias** siguen guardándose en el almacenamiento del WebView; el historial y las carpetas gestionadas ya están en SQLite. Falta migrar reglas y configuración.
+- **Duplicados y monitoreo de carpetas** no están en la versión de escritorio (la interfaz lo indica, sin datos de ejemplo).
+- **Arrastrar carpetas desde el Explorador** a la ventana no está implementado. `dragDropEnabled` está en `false` para que funcione el arrastre interno del árbol.
+- **Icono propio:** los iconos de `src-tauri/icons` son los de Tauri. Hay que generarlos con `npx tauri icon` a partir del logo.
 - **Listas grandes:** la vista previa renderiza todos los archivos. Con miles de archivos hará falta virtualizar la lista (por ejemplo, `@tanstack/react-virtual`).
 - **Internacionalización:** los textos están en español dentro de los componentes. Antes de añadir inglés hay que extraerlos a un catálogo.
 - **Clasificación por contenido (niveles 4–5):** todavía no está implementada; hoy solo se usan extensión, nombre, fecha y reglas.
@@ -121,4 +177,4 @@ src/
 
 ## Siguiente fase recomendada
 
-**Fase 2: base de escritorio.** Instalar Rust y añadir Tauri 2 al proyecto (`src-tauri/`). Después conectar el selector nativo de carpetas, configurar SQLite con migraciones para historial, reglas y configuración, definir los comandos tipados `scan`, `execute` y `undo` con eventos de progreso, y limitar los permisos de acceso a archivos a las carpetas que autorice el usuario.
+**Cerrar la Fase 2 y pasar a la Fase 5.** Probar a mano el flujo en la app con una carpeta de prueba, mover reglas y preferencias a SQLite, poner el icono propio y generar el primer instalador (`npm run tauri build`). Después, detección de duplicados real (tamaño → hash parcial → hash completo) y clasificación por contenido de PDF y documentos.

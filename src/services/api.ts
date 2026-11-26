@@ -1,20 +1,27 @@
 /**
  * Capa de servicios de DeskFlow.
  *
- * La interfaz `DeskFlowApi` es el contrato con el motor. En la Fase 1 la
- * implementa `mockApi` (todo en memoria, con tiempos simulados). En la
- * Fase 2 se añadirá `tauriApi`, que llama a comandos de Rust con `invoke` y
- * recibe el progreso por eventos; las pantallas no tendrán que cambiar.
+ * `DeskFlowApi` es el contrato con el motor. Hay dos implementaciones:
+ * - `mockApi` (este archivo): todo en memoria, para el navegador y el prototipo.
+ * - `tauriApi` (`tauriApi.ts`): comandos de Rust dentro de la app de escritorio.
+ * Las pantallas solo usan `api` y no saben cuál está activa.
  */
+import { isTauri } from '@tauri-apps/api/core'
 import { DUPLICATE_GROUPS, EXISTING_FILES, MOCK_FILES, SOURCE_FOLDERS } from '@/data/mock'
 import { classify } from '@/services/classifier'
+import { localFs } from '@/services/localFs'
+import { tauriApi } from '@/services/tauriApi'
 import type {
+  DirProbe,
   DuplicateGroup,
   DuplicateProgress,
+  Environment,
   ExecProgress,
+  IndexedFolderRaw,
   MoveRecord,
   Operation,
   OrganizePlan,
+  PickedFolder,
   Rule,
   ScanOptions,
   ScanProgress,
@@ -22,14 +29,27 @@ import type {
   SourceFolder,
 } from '@/types'
 import { uid } from '@/lib/id'
+import { cloudProvider } from '@/utils/destination'
+export { NotAvailableError } from '@/services/errors'
 
 export interface DeskFlowApi {
-  /** Indica si las operaciones afectan al disco real. */
+  /** `mock`: datos simulados. `native`: disco real a través de Rust. */
   readonly mode: 'mock' | 'native'
+  environment(): Promise<Environment>
   listSuggestedFolders(): Promise<SourceFolder[]>
-  /** `skipDirs`: carpetas relativas al origen que DeskFlow ya organizó; no se vuelven a analizar. */
+  /** Selector de carpetas. En modo nativo, la carpeta elegida queda autorizada. */
+  pickFolder(title: string, start?: string): Promise<PickedFolder | null>
+  /** Qué carpetas de destino existen y qué archivos contienen. */
+  probeDirs(paths: string[]): Promise<DirProbe[]>
+  /** Carpeta Documentos que no está en la nube; la crea si no existe. */
+  localDocuments(): Promise<{ path: string; created: boolean }>
+  /** Si el motor tiene permiso sobre cada ruta (las elegidas en el selector o sugeridas). */
+  checkAccess(paths: string[]): Promise<boolean[]>
+  /** Estructura de carpetas existente bajo `root` (solo lectura). `skip`: rutas absolutas a omitir. */
+  indexStructure(root: string, maxDepth: number, skip: string[]): Promise<IndexedFolderRaw[]>
+  /** `skipDirs`: carpetas relativas al origen que DeskFlow ya organizó. */
   scan(
-    sourceId: string,
+    source: SourceFolder,
     opts: ScanOptions,
     rules: Rule[],
     skipDirs: string[],
@@ -38,6 +58,8 @@ export interface DeskFlowApi {
   ): Promise<ScanResult>
   execute(plan: OrganizePlan, onProgress: (p: ExecProgress) => void, signal: AbortSignal): Promise<Operation>
   undo(op: Operation, onProgress: (p: ExecProgress) => void): Promise<Operation>
+  /** Historial persistente (null en modo simulado: lo guarda el navegador). */
+  loadHistory(): Promise<{ operations: Operation[]; managed: string[] } | null>
   findDuplicates(onProgress: (p: DuplicateProgress) => void, signal: AbortSignal): Promise<DuplicateGroup[]>
   quarantineDuplicates(fileIds: string[], groups: DuplicateGroup[]): Promise<Operation>
 }
@@ -51,46 +73,80 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     })
   })
 
-export const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
+export const isAbort = (e: unknown) =>
+  (e instanceof DOMException && e.name === 'AbortError') || (e instanceof Error && /cancelad/i.test(e.message))
 
 const mockApi: DeskFlowApi = {
   mode: 'mock',
+
+  async environment() {
+    const libraries = localFs.libraries()
+    const libraryCloud: Environment['libraryCloud'] = {}
+    for (const k of Object.keys(libraries) as (keyof typeof libraries)[]) {
+      const p = cloudProvider(libraries[k])
+      if (p) libraryCloud[k] = p
+    }
+    return { home: 'C:\\Users\\Usuario', libraries, libraryCloud }
+  },
 
   async listSuggestedFolders() {
     await sleep(120)
     return SOURCE_FOLDERS
   },
 
-  async scan(sourceId, opts, rules, skipDirs, onProgress, signal) {
+  async pickFolder() {
+    // En el navegador se usa el selector simulado (FolderPicker); este método no se llama.
+    return null
+  },
+
+  async probeDirs(paths) {
+    return paths.map((path) => {
+      const prefix = path.toLowerCase() + '\\'
+      const files = EXISTING_FILES.filter((f) => f.toLowerCase().startsWith(prefix) && !f.slice(prefix.length).includes('\\')).map((f) =>
+        f.slice(prefix.length),
+      )
+      return { path, exists: localFs.exists(path), files }
+    })
+  },
+
+  async localDocuments() {
+    return localFs.findOrCreateLocalDocuments()
+  },
+
+  async checkAccess(paths) {
+    return paths.map(() => true)
+  },
+
+  async indexStructure(root, maxDepth, skip) {
+    await sleep(180)
+    return localFs.index(root, maxDepth, skip)
+  },
+
+  async scan(sourceFolder, opts, rules, skipDirs, onProgress, signal) {
     const t0 = performance.now()
-    const source = SOURCE_FOLDERS.find((s) => s.id === sourceId)
+    const source = SOURCE_FOLDERS.find((s) => s.id === sourceFolder.id)
     if (!source) throw new Error('Carpeta no encontrada')
     const skip = skipDirs.map((d) => d.toLowerCase())
     const inManaged = (relDir: string) => {
       const r = relDir.toLowerCase()
       return !!r && skip.some((d) => r === d || r.startsWith(d + '/'))
     }
-    const candidates = MOCK_FILES[sourceId].filter((f) => opts.recursive || !f.relDir)
+    const candidates = MOCK_FILES[source.id].filter((f) => opts.recursive || !f.relDir)
     const files = candidates.filter((f) => !inManaged(f.relDir))
     const skippedManaged = candidates.length - files.length
     const total = files.length
-    const tick = (phase: ScanProgress['phase'], processed: number, current: string) =>
-      onProgress({ phase, processed, total, current })
+    const tick = (phase: ScanProgress['phase'], processed: number, current: string) => onProgress({ phase, processed, total, current })
 
-    // Fase 1: recorrer directorios.
     for (let i = 0; i < total; i += 6) {
       tick('walking', Math.min(i + 6, total), `${source.path}\\${files[i].relDir ? files[i].relDir + '\\' : ''}${files[i].name}`)
       await sleep(28, signal)
     }
-    // Fase 2: metadatos (nombre, tamaño, fecha).
     for (let i = 0; i < total; i += 9) {
       tick('metadata', Math.min(i + 9, total), files[i].name)
       await sleep(22, signal)
     }
-    // Fase 3: reglas.
     tick('rules', total, `${rules.filter((r) => r.enabled).length} reglas activas`)
     await sleep(280, signal)
-    // Fase 4: clasificación.
     const classifications = []
     for (let i = 0; i < total; i++) {
       classifications.push(classify(files[i], rules, opts))
@@ -101,7 +157,7 @@ const mockApi: DeskFlowApi = {
     }
     tick('done', total, '')
     await sleep(240, signal)
-    return { source, files, classifications, existing: EXISTING_FILES, skippedManaged, durationMs: performance.now() - t0 }
+    return { source, files, classifications, existing: [], skippedManaged, durationMs: performance.now() - t0 }
   },
 
   async execute(plan, onProgress, signal) {
@@ -122,8 +178,7 @@ const mockApi: DeskFlowApi = {
       }
     }
     onProgress({ done: total, total, current: '' })
-    for (const s of plan.skipped)
-      moves.push({ fileId: s.fileId, name: s.name, from: s.name, to: '', status: 'skipped', note: s.reason })
+    for (const s of plan.skipped) moves.push({ fileId: s.fileId, name: s.name, from: s.name, to: '', status: 'skipped', note: s.reason })
     await sleep(200, signal)
     return {
       id: uid('op'),
@@ -148,11 +203,7 @@ const mockApi: DeskFlowApi = {
       await sleep(total > 60 ? 14 : 36)
       // Simulación: un archivo modificado tras moverse no se restaura a ciegas.
       const modified = i === 3 && total > 20
-      restored.push(
-        modified
-          ? { ...m, status: 'not_restored', note: 'Se modificó después de organizarlo. Se dejó en su ubicación actual.' }
-          : { ...m, status: 'restored' },
-      )
+      restored.push(modified ? { ...m, status: 'not_restored', note: 'Se modificó después de organizarlo. Se dejó en su ubicación actual.' } : { ...m, status: 'restored' })
     }
     onProgress({ done: total, total, current: '' })
     await sleep(200)
@@ -160,11 +211,14 @@ const mockApi: DeskFlowApi = {
     return {
       ...op,
       moves: op.moves.map((m) => restored.find((r) => r.fileId === m.fileId) ?? m),
-      // Deshecha aunque quede algún archivo sin restaurar: el detalle lo explica en `errors`.
       status: 'rolled_back',
       undoneAt: new Date().toISOString(),
       errors: failed ? [...op.errors, `${failed} archivo(s) no se restauraron porque cambiaron después de organizarlos.`] : op.errors,
     }
+  },
+
+  async loadHistory() {
+    return null
   },
 
   async findDuplicates(onProgress, signal) {
@@ -201,4 +255,5 @@ const mockApi: DeskFlowApi = {
   },
 }
 
-export const api: DeskFlowApi = mockApi
+export const api: DeskFlowApi = isTauri() ? tauriApi : mockApi
+export const isNative = api.mode === 'native'

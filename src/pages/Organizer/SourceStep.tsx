@@ -8,7 +8,8 @@ import { Panel, Skeleton, Switch } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { formatBytes, plural } from '@/lib/format'
 import { list, listItem } from '@/lib/motion'
-import { api } from '@/services/api'
+import { api, isNative } from '@/services/api'
+import { toast } from '@/stores/toasts'
 import { useOrganizer } from '@/stores/organizer'
 import { useRules } from '@/stores/rules'
 import { useSettings } from '@/stores/settings'
@@ -24,12 +25,29 @@ export default function SourceStep() {
   const [folders, setFolders] = useState<SourceFolder[] | null>(null)
 
   useEffect(() => {
-    api.listSuggestedFolders().then(setFolders)
+    api.listSuggestedFolders().then((list) => {
+      // Si ya hay un origen elegido con "Examinar", se mantiene en la lista.
+      const current = useOrganizer.getState().source
+      setFolders(current && !list.some((f) => f.id === current.id) ? [...list, current] : list)
+    })
   }, [])
 
+  const browse = async () => {
+    try {
+      const picked = await api.pickFolder('Elegir carpeta a organizar', source?.path)
+      if (!picked) return
+      if (picked.problem) return toast({ tone: 'danger', title: 'No se puede organizar esa carpeta', description: picked.problem })
+      const folder: SourceFolder = { id: picked.path, name: picked.name, path: picked.path, fileCount: -1, size: 0 }
+      setFolders((fs) => (fs && !fs.some((f) => f.id === folder.id) ? [...fs, folder] : fs))
+      selectSource(folder)
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudo abrir el selector', description: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-      <section aria-labelledby="src-title">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+      <section aria-labelledby="src-title" className="min-w-0">
         <Panel className="p-5">
           <h2 id="src-title" className="text-[14px] font-semibold text-text">
             ¿Qué carpeta quieres organizar?
@@ -51,22 +69,26 @@ export default function SourceStep() {
                       aria-checked={selected}
                       onClick={() => selectSource(f)}
                       className={cn(
-                        'flex items-center gap-3.5 rounded-xl border p-3.5 text-left transition-[border-color,background-color,box-shadow] duration-200',
+                        'flex min-w-0 items-center gap-3.5 rounded-xl border p-3.5 text-left transition-[border-color,background-color,box-shadow] duration-200',
                         selected ? 'border-primary bg-primary-soft/60 ring-3 ring-[var(--df-ring)]' : 'border-border hover:border-border-strong hover:bg-surface-2/50',
                       )}
                     >
-                      <span className={cn('grid size-10 place-items-center rounded-lg transition-colors', selected ? 'bg-primary text-primary-fg' : 'bg-surface-2 text-muted')}>
+                      <span className={cn('grid size-10 shrink-0 place-items-center rounded-lg transition-colors', selected ? 'bg-primary text-primary-fg' : 'bg-surface-2 text-muted')}>
                         <Icon className="size-[18px]" strokeWidth={1.8} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[13.5px] font-medium text-text">{f.name}</span>
-                        <span className="block truncate font-mono text-[11.5px] text-faint">{f.path}</span>
+                        <span className="block truncate font-mono text-[11.5px] text-faint" title={f.path}>
+                          {f.path}
+                        </span>
                       </span>
-                      <span className="text-right text-[12px] text-muted max-[600px]:hidden">
-                        <span className="block tabular-nums">{plural(f.fileCount, 'archivo', 'archivos')}</span>
-                        <span className="block text-faint tabular-nums">{formatBytes(f.size)}</span>
-                      </span>
-                      <span className={cn('grid size-5 place-items-center rounded-full border transition-colors', selected ? 'border-primary bg-primary text-primary-fg' : 'border-border-strong')}>
+                      {f.fileCount >= 0 && (
+                        <span className="text-right text-[12px] text-muted max-[600px]:hidden">
+                          <span className="block tabular-nums">{plural(f.fileCount, 'archivo', 'archivos')}</span>
+                          <span className="block text-faint tabular-nums">{formatBytes(f.size)}</span>
+                        </span>
+                      )}
+                      <span className={cn('grid size-5 shrink-0 place-items-center rounded-full border transition-colors', selected ? 'border-primary bg-primary text-primary-fg' : 'border-border-strong')}>
                         {selected && <Check className="size-3" strokeWidth={3} />}
                       </span>
                     </motion.button>
@@ -77,10 +99,12 @@ export default function SourceStep() {
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-border-strong px-4 py-3.5">
             <FolderSearch className="size-[18px] shrink-0 text-faint" strokeWidth={1.8} />
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-text">Elegir otra carpeta o arrastrarla aquí</div>
-              <div className="text-[12px] text-faint">Necesita el selector nativo de Windows: llega con la versión de escritorio (Fase 2).</div>
+              <div className="text-[13px] font-medium text-text">Elegir otra carpeta</div>
+              <div className="text-[12px] text-faint">
+                {isNative ? 'Abre el selector de Windows. DeskFlow solo tendrá acceso a esa carpeta.' : 'Disponible en la app de escritorio.'}
+              </div>
             </div>
-            <Button size="sm" disabled>
+            <Button size="sm" disabled={!isNative} onClick={browse}>
               Examinar…
             </Button>
           </div>
@@ -94,7 +118,7 @@ export default function SourceStep() {
         </Panel>
       </section>
 
-      <aside className="space-y-4">
+      <aside className="min-w-0 space-y-4">
         <Panel className="p-5">
           <h2 className="text-[14px] font-semibold text-text">¿Dónde guardar lo organizado?</h2>
           <p className="mt-0.5 mb-3.5 text-[12.5px] text-muted">Local por defecto; la nube solo si la confirmas. Se recuerda tu elección.</p>
@@ -124,6 +148,12 @@ export default function SourceStep() {
             </div>
             <Option label="Incluir subcarpetas" hint="Analiza también las carpetas internas" checked={settings.recursive} onChange={(v) => settings.set({ recursive: v })} />
             <Option label="Subcarpetas por año" hint="Ej. Facturas/2026, Fotografías/2025" checked={settings.yearSubfolders} onChange={(v) => settings.set({ yearSubfolders: v })} />
+            <Option
+              label="Usar mi estructura"
+              hint="Coloca cada archivo en tus carpetas existentes cuando coincide"
+              checked={settings.useStructure}
+              onChange={(v) => settings.set({ useStructure: v })}
+            />
             <button
               type="button"
               onClick={() => navigate('/reglas')}

@@ -1,3 +1,4 @@
+import { folderPathProblem, normalizeFolderPath } from '@/utils/names'
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowDown, ArrowUp, CornerDownRight, Inbox, Pencil, Plus, Trash, Workflow, X } from 'lucide-react'
@@ -11,6 +12,7 @@ import { plural } from '@/lib/format'
 import { ease } from '@/lib/motion'
 import { MOCK_FILES } from '@/data/mock'
 import { categoryOf } from '@/services/classifier'
+import { isNative } from '@/services/api'
 import { useRules } from '@/stores/rules'
 import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/toasts'
@@ -106,7 +108,9 @@ export default function Rules() {
                       </div>
                     )}
                   </div>
-                  <span className="text-right text-[11.5px] text-faint max-[700px]:hidden">{plural(countMatches(r), 'coincidencia', 'coincidencias')}</span>
+                  {!isNative && (
+                    <span className="text-right text-[11.5px] text-faint max-[700px]:hidden">{plural(countMatches(r), 'coincidencia', 'coincidencias')}</span>
+                  )}
                   <div className="flex items-center gap-0.5">
                     <Button size="sm" variant="ghost" icon={ArrowUp} aria-label={`Subir prioridad de ${r.name}`} disabled={i === 0} onClick={() => move(r.id, -1)} />
                     <Button size="sm" variant="ghost" icon={ArrowDown} aria-label={`Bajar prioridad de ${r.name}`} disabled={i === rules.length - 1} onClick={() => move(r.id, 1)} />
@@ -166,7 +170,7 @@ function RuleEditor({ initial, isNew, onClose, onSave }: { initial: Rule; isNew:
   const [rule, setRule] = useState<Rule>(initial)
   const reviewName = useSettings((s) => s.reviewFolderName)
   const matches = useMemo(() => countMatches(rule), [rule])
-  const valid = rule.name.trim() && rule.conditions.every((c) => c.value.trim()) && (rule.action === 'review' || rule.destination.trim())
+  const valid = rule.name.trim() && rule.conditions.every((c) => c.value.trim()) && (rule.action === 'review' || !folderPathProblem(rule.destination))
 
   const updateCond = (id: string, patch: Partial<RuleCondition>) =>
     setRule((r) => ({ ...r, conditions: r.conditions.map((c) => (c.id === id ? { ...c, ...patch } : c)) }))
@@ -181,10 +185,16 @@ function RuleEditor({ initial, isNew, onClose, onSave }: { initial: Rule; isNew:
       footer={
         <>
           <span className="mr-auto self-center text-[12.5px] text-muted">
-            Coincide con <strong className="font-semibold text-text tabular-nums">{matches}</strong> de {SAMPLE.length} archivos de ejemplo
+            {isNative ? (
+              'Verás qué archivos coinciden en la vista previa de Organizar.'
+            ) : (
+              <>
+                Coincide con <strong className="font-semibold text-text tabular-nums">{matches}</strong> de {SAMPLE.length} archivos de ejemplo
+              </>
+            )}
           </span>
           <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...rule, name: rule.name.trim(), destination: rule.destination.trim().replace(/^\/+|\/+$/g, '') })}>
+          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...rule, name: rule.name.trim(), destination: normalizeFolderPath(rule.destination) })}>
             Guardar regla
           </Button>
         </>

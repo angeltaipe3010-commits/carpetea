@@ -38,6 +38,16 @@ export interface Classification {
   confidence: Confidence
   reason: string
   ruleId?: string
+  /** Cómo se eligió el destino: carpeta existente del usuario o categoría encajada en ella. */
+  via?: 'structure' | 'anchored' | 'course'
+}
+
+/** Carpeta existente en el destino, tal como la devuelve el motor. */
+export interface IndexedFolderRaw {
+  rel: string
+  files: string[]
+  fileCount: number
+  project: boolean
 }
 
 export interface SourceFolder {
@@ -63,6 +73,8 @@ export interface ScanOptions {
   applyRules: boolean
   yearSubfolders: boolean
   reviewFolderName: string
+  skipHidden: boolean
+  exclusions: string[]
 }
 
 export interface ScanResult {
@@ -204,6 +216,8 @@ export interface Destination {
   customPath: string
   /** El usuario confirmó guardar en una carpeta sincronizada con la nube. */
   allowCloud?: boolean
+  /** Proveedor detectado por el motor al elegir la carpeta (más fiable que el nombre). */
+  cloudProvider?: string
 }
 
 /** Carpeta del sistema de archivos local (lo que devuelve el selector). */
@@ -215,6 +229,34 @@ export interface FsFolder {
   cloud?: string
   /** Carpeta del sistema protegida. */
   system?: boolean
+}
+
+export interface LibrariesInfo {
+  documents: string
+  pictures: string
+  videos: string
+  music: string
+}
+
+/** Entorno del equipo: bibliotecas de Windows y si están en la nube. */
+export interface Environment {
+  home: string
+  libraries: LibrariesInfo
+  /** Proveedor de nube por biblioteca (`documents` → `OneDrive`). */
+  libraryCloud: Partial<Record<keyof LibrariesInfo, string>>
+}
+
+export interface PickedFolder {
+  name: string
+  path: string
+  cloud?: string
+  problem?: string
+}
+
+export interface DirProbe {
+  path: string
+  exists: boolean
+  files: string[]
 }
 
 export type ThemePref = 'system' | 'light' | 'dark'

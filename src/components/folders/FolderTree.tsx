@@ -102,6 +102,12 @@ function Row({
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  const row = useRef<HTMLDivElement>(null)
+  // Al terminar de renombrar con el teclado, el foco vuelve a la carpeta.
+  const stopEditing = () => {
+    setEditing(false)
+    requestAnimationFrame(() => row.current?.focus())
+  }
   const isSelected = selected === node.path
   const isReview = !isRoot && node.depth === 1 && node.name === reviewName
   const hasChildren = node.children.length > 0
@@ -119,6 +125,18 @@ function Row({
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (editing) return
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+      // Flechas: recorrer las carpetas visibles sin pasar por todas con Tab.
+      const items = Array.from(row.current?.closest('[role="tree"]')?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])
+      const i = items.indexOf(e.currentTarget)
+      const next =
+        e.key === 'Home' ? items[0] : e.key === 'End' ? items[items.length - 1] : items[i + (e.key === 'ArrowDown' ? 1 : -1)]
+      if (next) {
+        e.preventDefault()
+        next.focus()
+      }
+      return
+    }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onSelect(node.path)
@@ -129,6 +147,7 @@ function Row({
 
   return (
     <div
+      ref={row}
       role="treeitem"
       aria-selected={isSelected}
       aria-expanded={hasChildren ? open : undefined}
@@ -188,8 +207,11 @@ function Row({
           onBlur={commit}
           onKeyDown={(e) => {
             e.stopPropagation()
-            if (e.key === 'Enter') commit()
-            if (e.key === 'Escape') setEditing(false)
+            if (e.key === 'Enter') {
+              commit()
+              requestAnimationFrame(() => row.current?.focus())
+            }
+            if (e.key === 'Escape') stopEditing()
           }}
           className="h-6 min-w-0 flex-1 rounded-md border border-primary bg-surface px-1.5 text-[13px] outline-none ring-3 ring-[var(--df-ring)]"
         />

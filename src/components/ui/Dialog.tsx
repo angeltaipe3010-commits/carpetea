@@ -24,6 +24,14 @@ const stack: string[] = []
 export function Dialog({ open, onClose, title, description, children, footer, width = 'md', locked }: DialogProps) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
+  // En refs: si onClose cambia en cada render (flecha en línea), el efecto no
+  // debe reiniciarse, porque eso saca el foco del diálogo en cada pulsación.
+  const closeRef = useRef(onClose)
+  const lockedRef = useRef(locked)
+  useEffect(() => {
+    closeRef.current = onClose
+    lockedRef.current = locked
+  })
 
   useEffect(() => {
     if (!open) return
@@ -31,7 +39,7 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
     stack.push(titleId)
     const onKey = (e: KeyboardEvent) => {
       if (stack[stack.length - 1] !== titleId) return
-      if (e.key === 'Escape' && !locked) onClose()
+      if (e.key === 'Escape' && !lockedRef.current) closeRef.current()
       // Trampa de foco simple dentro del diálogo.
       if (e.key === 'Tab' && panel.current) {
         const items = panel.current.querySelectorAll<HTMLElement>(
@@ -51,7 +59,9 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
     }
     document.addEventListener('keydown', onKey)
     requestAnimationFrame(() => {
-      const target = panel.current?.querySelector<HTMLElement>('[data-autofocus], input, button:not([data-close])')
+      const root = panel.current
+      const target =
+        root?.querySelector<HTMLElement>('[data-autofocus]') ?? root?.querySelector<HTMLElement>('input, button:not([data-close])')
       target?.focus()
     })
     return () => {
@@ -60,7 +70,7 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
       document.removeEventListener('keydown', onKey)
       prev?.focus?.()
     }
-  }, [open, onClose, locked, titleId])
+  }, [open, titleId])
 
   return createPortal(
     <AnimatePresence>

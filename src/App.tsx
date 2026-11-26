@@ -1,9 +1,14 @@
+import { useEffect } from 'react'
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence, MotionConfig } from 'motion/react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Toaster } from '@/components/ui/feedback'
 import { useApplyPreferences } from '@/hooks/useTheme'
 import { useSettings } from '@/stores/settings'
+import { useEnv } from '@/stores/env'
+import { useHistory } from '@/stores/history'
+import { api } from '@/services/api'
+import { toast } from '@/stores/toasts'
 import Dashboard from '@/pages/Dashboard'
 import Organizer from '@/pages/Organizer'
 import Duplicates from '@/pages/Duplicates'
@@ -31,6 +36,14 @@ function AnimatedRoutes() {
 
 export default function App() {
   useApplyPreferences()
+  useEffect(() => {
+    useEnv.getState().load().catch(() => {})
+    // En escritorio el historial vive en SQLite y reemplaza al del navegador.
+    api
+      .loadHistory()
+      .then((h) => h && useHistory.setState({ operations: h.operations, managed: h.managed }))
+      .catch((e) => toast({ tone: 'danger', title: 'No se pudo leer el historial', description: String(e) }))
+  }, [])
   const motionPref = useSettings((s) => s.motion)
   return (
     // HashRouter: funciona igual en el navegador y dentro del WebView de Tauri.

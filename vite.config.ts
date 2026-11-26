@@ -10,5 +10,10 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    // El motor de Rust se recompila por su cuenta; Vite no debe vigilar src-tauri.
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
 })

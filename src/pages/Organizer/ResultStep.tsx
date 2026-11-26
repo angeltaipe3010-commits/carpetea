@@ -21,7 +21,7 @@ export default function ResultStep() {
       const moved = operation.moves.filter((m) => m.status === 'moved').length
       toast({
         tone: operation.errors.length ? 'warning' : 'success',
-        title: `${source?.name} organizada`,
+        title: moved ? `${source?.name} organizada` : `No se movió ningún archivo`,
         description: `${plural(moved, 'archivo movido', 'archivos movidos')}${operation.errors.length ? ` · ${plural(operation.errors.length, 'aviso', 'avisos')}` : ''}`,
       })
     }
@@ -45,22 +45,33 @@ export default function ResultStep() {
   }
 
   const moved = operation.moves.filter((m) => m.status === 'moved').length
-  const skipped = operation.moves.filter((m) => m.status === 'skipped').length
+  const notMoved = operation.moves.filter((m) => m.status === 'skipped' || m.status === 'failed').length
+  const nothingMoved = moved === 0
 
   return (
     <Panel className="mx-auto max-w-[640px] px-7 py-8 text-center">
       <div className="flex justify-center">
-        <SuccessCheck />
+        {nothingMoved ? (
+          <span className="grid size-14 place-items-center rounded-full bg-warning-soft text-warning">
+            <TriangleExclamationPoint className="size-7" />
+          </span>
+        ) : (
+          <SuccessCheck />
+        )}
       </div>
       <motion.h2
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.25, duration: 0.4, ease: ease.out } }}
         className="mt-4 text-[19px] font-semibold tracking-[-0.015em] text-text"
       >
-        {source?.name} está organizada
+        {nothingMoved ? `No se movió ningún archivo de ${source?.name}` : `${source?.name} está organizada`}
       </motion.h2>
       <p className="mt-1 text-[13.5px] text-muted">
-        {operation.errors.length ? 'Terminó con algunos avisos. Nada se perdió ni se sobrescribió.' : 'Todo salió bien. Puedes deshacerlo cuando quieras desde el Historial.'}
+        {nothingMoved
+          ? 'Revisa los avisos de abajo. Tus archivos siguen donde estaban.'
+          : operation.errors.length
+            ? 'Terminó con algunos avisos. Nada se perdió ni se sobrescribió.'
+            : 'Todo salió bien. Puedes deshacerlo cuando quieras desde el Historial.'}
       </p>
       {operation.destination && (
         <p className="mx-auto mt-2 max-w-full truncate font-mono text-[11.5px] text-faint" title={operation.destination}>
@@ -72,7 +83,7 @@ export default function ResultStep() {
         {[
           { label: 'Archivos movidos', value: moved },
           { label: 'Carpetas creadas', value: operation.foldersCreated.length },
-          { label: 'Sin mover', value: skipped },
+          { label: 'Sin mover', value: notMoved },
         ].map((s) => (
           <motion.div key={s.label} variants={listItem} className="rounded-xl border border-border px-4 py-3">
             <dt className="text-[12px] text-muted">{s.label}</dt>

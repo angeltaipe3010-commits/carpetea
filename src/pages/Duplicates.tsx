@@ -10,7 +10,7 @@ import { FileIcon } from '@/components/files/FileBits'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime, plural } from '@/lib/format'
 import { list, listItem } from '@/lib/motion'
-import { api, isAbort } from '@/services/api'
+import { api, isAbort, isNative } from '@/services/api'
 import { categoryOf } from '@/services/classifier'
 import { useHistory } from '@/stores/history'
 import { toast } from '@/stores/toasts'
@@ -82,7 +82,15 @@ export default function Duplicates() {
         }
       />
 
-      {scanning ? (
+      {isNative ? (
+        <Panel>
+          <EmptyState
+            icon={Copy}
+            title="Llega en una próxima versión"
+            description="La búsqueda real de duplicados (tamaño y hash del contenido) se implementa en la Fase 5. Por ahora DeskFlow no muestra datos de ejemplo aquí."
+          />
+        </Panel>
+      ) : scanning ? (
         <Panel className="p-6">
           <div className="flex items-center justify-between">
             <div>

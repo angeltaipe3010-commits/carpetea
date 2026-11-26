@@ -15,6 +15,8 @@ interface SettingsState {
   exclusions: string[]
   /** Destino predeterminado al organizar. */
   destination: Destination
+  /** Encajar los archivos en las carpetas que ya existen en el destino. */
+  useStructure: boolean
   set: (patch: Partial<Omit<SettingsState, 'set' | 'addExclusion' | 'removeExclusion' | 'reset'>>) => void
   addExclusion: (path: string) => void
   removeExclusion: (path: string) => void
@@ -31,6 +33,7 @@ const defaults = {
   skipHidden: true,
   contentAnalysis: true,
   destination: { mode: 'source', customPath: '' } as Destination,
+  useStructure: true,
   exclusions: ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', '%APPDATA%', 'node_modules', '.git'],
 }
 

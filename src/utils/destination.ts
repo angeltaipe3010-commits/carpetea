@@ -66,6 +66,23 @@ const LIBRARY_OF: Record<string, keyof Libraries> = {
 /** Carpetas de primer nivel que en modo bibliotecas se fusionan con la biblioteca. */
 const MERGES_INTO_LIBRARY = new Set(['Documentos', 'Imágenes', 'Videos', 'Audio'])
 
+/**
+ * Raíces cuya estructura se aprende para "Usar mi estructura", con el prefijo
+ * lógico que tienen en el árbol de DeskFlow.
+ */
+export function structureRoots(dest: Destination, sourcePath: string, libs: Libraries): { root: string; prefix: string[] }[] {
+  if (dest.mode === 'custom' && dest.customPath) return [{ root: dest.customPath, prefix: [] }]
+  if (dest.mode === 'libraries') {
+    return [
+      { root: libs.documents, prefix: ['Documentos'] },
+      { root: libs.pictures, prefix: ['Imágenes'] },
+      { root: libs.videos, prefix: ['Videos'] },
+      { root: libs.music, prefix: ['Audio'] },
+    ].filter((r) => r.root)
+  }
+  return sourcePath ? [{ root: sourcePath, prefix: [] }] : []
+}
+
 export interface Resolver {
   /** Ruta absoluta de una carpeta lógica del árbol (segmentos relativos). */
   dir: (segs: string[]) => string
