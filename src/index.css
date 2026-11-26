@@ -1,0 +1,182 @@
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────────────────── Design tokens ─────────────────────────
+   Paleta del blueprint de DeskFlow. Los valores viven en variables
+   para que el modo oscuro solo redefina colores, no componentes.
+   `text-muted` (#5F6679) es más oscuro que el Secondary (#8991A3) del
+   blueprint para cumplir contraste AA en texto pequeño; #8991A3 se
+   usa como `faint` para iconos, metadatos y separadores visuales. */
+:root {
+  --df-bg: #f7f8fa;
+  --df-surface: #ffffff;
+  --df-surface-2: #f2f3f7;
+  --df-surface-3: #e9ebf1;
+  --df-text: #202431;
+  --df-muted: #5f6679;
+  --df-faint: #8991a3;
+  --df-border: #e8eaf0;
+  --df-border-strong: #d9dce5;
+  --df-primary: #5865d9;
+  --df-primary-hover: #4a56c9;
+  --df-primary-soft: #eef0fc;
+  --df-primary-fg: #ffffff;
+  --df-success: #2f9a6e;
+  --df-success-soft: #e8f6ef;
+  --df-warning: #b97d2c;
+  --df-warning-soft: #fbf3e6;
+  --df-danger: #c95555;
+  --df-danger-soft: #fbeded;
+  --df-ring: rgb(88 101 217 / 0.35);
+  --df-shadow: 0 1px 2px rgb(32 36 49 / 0.04), 0 4px 16px rgb(32 36 49 / 0.05);
+  --df-shadow-lg: 0 8px 32px rgb(32 36 49 / 0.12), 0 2px 6px rgb(32 36 49 / 0.06);
+  color-scheme: light;
+}
+
+.dark {
+  --df-bg: #0f1117;
+  --df-surface: #161921;
+  --df-surface-2: #1c2029;
+  --df-surface-3: #242934;
+  --df-text: #e8eaf0;
+  --df-muted: #a2a8b8;
+  --df-faint: #737a8c;
+  --df-border: #252a35;
+  --df-border-strong: #313746;
+  --df-primary: #7380f0;
+  --df-primary-hover: #8590f5;
+  --df-primary-soft: #1f2340;
+  --df-primary-fg: #ffffff;
+  --df-success: #4cc08f;
+  --df-success-soft: #15291f;
+  --df-warning: #e3ac5c;
+  --df-warning-soft: #2c2215;
+  --df-danger: #e57a7a;
+  --df-danger-soft: #301a1c;
+  --df-ring: rgb(115 128 240 / 0.45);
+  --df-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --df-shadow-lg: 0 12px 40px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --color-bg: var(--df-bg);
+  --color-surface: var(--df-surface);
+  --color-surface-2: var(--df-surface-2);
+  --color-surface-3: var(--df-surface-3);
+  --color-text: var(--df-text);
+  --color-muted: var(--df-muted);
+  --color-faint: var(--df-faint);
+  --color-border: var(--df-border);
+  --color-border-strong: var(--df-border-strong);
+  --color-primary: var(--df-primary);
+  --color-primary-hover: var(--df-primary-hover);
+  --color-primary-soft: var(--df-primary-soft);
+  --color-primary-fg: var(--df-primary-fg);
+  --color-success: var(--df-success);
+  --color-success-soft: var(--df-success-soft);
+  --color-warning: var(--df-warning);
+  --color-warning-soft: var(--df-warning-soft);
+  --color-danger: var(--df-danger);
+  --color-danger-soft: var(--df-danger-soft);
+  --shadow-card: var(--df-shadow);
+  --shadow-pop: var(--df-shadow-lg);
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Primera regla efectiva: fondo en html/body para no tener destello. */
+html,
+body {
+  background: var(--df-bg);
+  color: var(--df-text);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+}
+
+::selection {
+  background: var(--df-primary-soft);
+  color: var(--df-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--df-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Barras de desplazamiento discretas, al estilo de apps nativas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--df-border-strong) transparent;
+}
+
+input[type='range'] {
+  accent-color: var(--df-primary);
+}
+
+/* Movimiento reducido: por sistema o forzado desde Configuración. */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.motion-full) *,
+  html:not(.motion-full) *::before,
+  html:not(.motion-full) *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+html.motion-reduced *,
+html.motion-reduced *::before,
+html.motion-reduced *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+@keyframes df-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.df-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--df-surface-2) 0%,
+    var(--df-surface-3) 50%,
+    var(--df-surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: df-shimmer 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes df-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
