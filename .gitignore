@@ -29,3 +29,6 @@ dist-ssr
 /playwright-report/
 
 e2e/.explore
+
+# Web: el instalador se copia con "npm run site" (no va en git)
+website/downloads/*.exe

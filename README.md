@@ -63,6 +63,17 @@ Cubre, por orden de riesgo:
 
 **Registro de errores:** el motor y la interfaz escriben en `%LOCALAPPDATA%\app.deskflow.desktop\logs\deskflow.log` (incluidos los pánicos; se rota al superar 1 MB). Nunca se envía: en *Configuración → Acerca de* hay un botón para abrir la carpeta y adjuntarlo al pedir ayuda.
 
+## Página web (`website/`)
+
+Página de presentación con el botón de descarga. Es estática (HTML, CSS y JS en un solo `index.html`, fuente Inter y capturas de la app con datos de ejemplo), sin dependencias externas ni rastreadores.
+
+```bash
+npm run tauri build   # genera el instalador
+npm run site          # lo copia a website/downloads y actualiza versión, tamaño y SHA-256 en la página
+```
+
+Después se sube la carpeta `website/` a cualquier hosting estático (GitHub Pages, Netlify, Cloudflare Pages…). El `.exe` no se guarda en git (`website/downloads/*.exe`). Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
+
 ## Licencia
 
 DeskFlow se distribuye con licencia [MIT](LICENSE): se ofrece tal cual, sin garantía. Las licencias del software de terceros que incluye están en `THIRD_PARTY_NOTICES.txt`.
