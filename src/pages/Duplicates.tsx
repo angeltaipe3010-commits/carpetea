@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { Copy, FolderInput, ScanSearch, ShieldCheck, X } from 'lucide-react'
+import { Check, FolderInput, FolderOpen, FolderSearch, ScanSearch, ShieldCheck, X } from 'lucide-react'
 import { Page, PageHeader } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
@@ -10,11 +10,13 @@ import { FileIcon } from '@/components/files/FileBits'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime, plural } from '@/lib/format'
 import { list, listItem } from '@/lib/motion'
-import { api, isAbort, isNative } from '@/services/api'
+import { api, isAbort } from '@/services/api'
 import { categoryOf } from '@/services/classifier'
 import { useHistory } from '@/stores/history'
+import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/toasts'
-import type { DuplicateGroup, DuplicateProgress } from '@/types'
+import type { DuplicateGroup, DuplicateProgress, SourceFolder } from '@/types'
+import { winJoin } from '@/utils/destination'
 
 const PHASE_LABEL: Record<DuplicateProgress['phase'], string> = {
   sizes: 'Agrupando por tamaño',
@@ -33,22 +35,49 @@ export default function Duplicates() {
   const [moving, setMoving] = useState(false)
   const controller = useRef<AbortController | null>(null)
   const addOp = useHistory((s) => s.add)
+  const addManaged = useHistory((s) => s.addManaged)
+  const reviewFolder = useSettings((s) => s.reviewFolderName)
+  const [folders, setFolders] = useState<SourceFolder[] | null>(null)
+  const [root, setRoot] = useState<SourceFolder | null>(null)
+  const quarantinePath = root ? winJoin(root.path, reviewFolder, 'Duplicados') : ''
+
+  useEffect(() => {
+    api.listSuggestedFolders().then((list) => {
+      setFolders(list)
+      setRoot((r) => r ?? list[0] ?? null)
+    })
+  }, [])
+
+  const browse = async () => {
+    try {
+      const picked = await api.pickFolder('Elegir carpeta donde buscar duplicados', root?.path)
+      if (!picked) return
+      if (picked.problem) return toast({ tone: 'danger', title: 'No se puede usar esa carpeta', description: picked.problem })
+      const folder: SourceFolder = { id: picked.path, name: picked.name, path: picked.path, fileCount: -1, size: 0 }
+      setFolders((fs) => (fs && !fs.some((f) => f.id === folder.id) ? [...fs, folder] : fs))
+      setRoot(folder)
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudo abrir el selector', description: e instanceof Error ? e.message : String(e) })
+    }
+  }
 
   const scanning = progress !== null && progress.phase !== 'done'
 
   const scan = async () => {
+    if (!root) return
     controller.current = new AbortController()
     setGroups(null)
     setProgress({ phase: 'sizes', processed: 0, total: 1 })
     try {
-      const g = await api.findDuplicates(setProgress, controller.current.signal)
+      const g = await api.findDuplicates(root.path, [quarantinePath], setProgress, controller.current.signal)
       // Sugerencia: conservar la copia más antigua (suele ser la original).
       const k: Keep = {}
       for (const grp of g) k[grp.id] = [...grp.files].sort((a, b) => a.modified.localeCompare(b.modified))[0].id
       setKeep(k)
       setGroups(g)
     } catch (e) {
-      if (!isAbort(e)) toast({ tone: 'danger', title: 'No se pudo completar la búsqueda' })
+      if (!isAbort(e))
+        toast({ tone: 'danger', title: 'No se pudo completar la búsqueda', description: e instanceof Error ? e.message : String(e) })
     } finally {
       setProgress(null)
     }
@@ -58,14 +87,29 @@ export default function Duplicates() {
   const recoverable = useMemo(() => (groups ?? []).reduce((s, g) => s + g.size * (g.files.length - 1), 0), [groups])
 
   const quarantine = async () => {
-    if (!groups) return
+    if (!groups || !root) return
     setMoving(true)
-    const op = await api.quarantineDuplicates(toMove, groups)
-    addOp(op)
-    setMoving(false)
-    setConfirm(false)
-    setGroups([])
-    toast({ tone: 'success', title: `${plural(toMove.length, 'duplicado apartado', 'duplicados apartados')}`, description: 'Están en Por revisar/Duplicados. Puedes deshacerlo desde el Historial.' })
+    try {
+      const op = await api.quarantineDuplicates(toMove, groups, root.path, reviewFolder)
+      addOp(op)
+      addManaged(op.foldersCreated)
+      const moved = new Set(op.moves.filter((m) => m.status === 'moved').map((m) => m.fileId))
+      const failed = op.moves.length - moved.size
+      // Quedan a la vista solo los grupos que siguen teniendo copias.
+      setGroups(groups.map((g) => ({ ...g, files: g.files.filter((f) => !moved.has(f.id)) })).filter((g) => g.files.length > 1))
+      toast({
+        tone: failed ? 'warning' : 'success',
+        title: plural(moved.size, 'duplicado apartado', 'duplicados apartados'),
+        description: failed
+          ? `${plural(failed, 'copia no se movió', 'copias no se movieron')} (en uso o cambiaron). Míralo en el Historial.`
+          : `Están en ${reviewFolder}/Duplicados. Puedes deshacerlo desde el Historial.`,
+      })
+    } catch (e) {
+      toast({ tone: 'danger', title: 'No se pudieron apartar las copias', description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setMoving(false)
+      setConfirm(false)
+    }
   }
 
   return (
@@ -75,22 +119,14 @@ export default function Duplicates() {
         description="Encuentra archivos con contenido idéntico, aunque tengan nombres distintos. DeskFlow nunca los elimina: los aparta para que decidas."
         actions={
           groups && groups.length > 0 ? (
-            <Button icon={ScanSearch} onClick={scan}>
+            <Button icon={ScanSearch} onClick={() => setGroups(null)}>
               Buscar de nuevo
             </Button>
           ) : null
         }
       />
 
-      {isNative ? (
-        <Panel>
-          <EmptyState
-            icon={Copy}
-            title="Llega en una próxima versión"
-            description="La búsqueda real de duplicados (tamaño y hash del contenido) se implementa en la Fase 5. Por ahora DeskFlow no muestra datos de ejemplo aquí."
-          />
-        </Panel>
-      ) : scanning ? (
+      {scanning ? (
         <Panel className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -111,21 +147,61 @@ export default function Duplicates() {
           </div>
         </Panel>
       ) : groups === null ? (
-        <Panel>
-          <EmptyState
-            icon={Copy}
-            title="Busca archivos repetidos"
-            description="Se comparan primero los tamaños y después el contenido con un hash, solo cuando hace falta. Así es rápido incluso con miles de archivos."
-            action={
-              <Button variant="primary" icon={ScanSearch} onClick={scan}>
-                Buscar duplicados
-              </Button>
-            }
-          />
+        <Panel className="p-5">
+          <h2 className="text-[14px] font-semibold text-text">¿Dónde buscar duplicados?</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
+            Se comparan primero los tamaños y después el contenido con un hash, solo cuando hace falta. Nada se mueve sin tu confirmación.
+          </p>
+          <div role="radiogroup" aria-label="Carpeta donde buscar" className="mt-4 grid gap-2.5">
+            {folders === null
+              ? [0, 1].map((i) => <Skeleton key={i} className="h-[58px] rounded-xl" />)
+              : folders.map((f) => {
+                  const selected = root?.id === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setRoot(f)}
+                      className={cn(
+                        'flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-[border-color,background-color] duration-200',
+                        selected ? 'border-primary bg-primary-soft/60' : 'border-border hover:border-border-strong hover:bg-surface-2/50',
+                      )}
+                    >
+                      <FolderOpen className={cn('size-[18px] shrink-0', selected ? 'text-primary' : 'text-muted')} strokeWidth={1.8} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-medium text-text">{f.name}</span>
+                        <span className="block truncate font-mono text-[11.5px] text-faint" title={f.path}>
+                          {f.path}
+                        </span>
+                      </span>
+                      {selected && <Check className="size-4 shrink-0 text-primary" strokeWidth={2.5} />}
+                    </button>
+                  )
+                })}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button icon={FolderSearch} onClick={browse}>
+              Examinar…
+            </Button>
+            <Button variant="primary" icon={ScanSearch} className="ml-auto" onClick={scan} disabled={!root}>
+              {root ? `Buscar duplicados en ${root.name}` : 'Elige una carpeta'}
+            </Button>
+          </div>
         </Panel>
       ) : groups.length === 0 ? (
         <Panel>
-          <EmptyState icon={ShieldCheck} title="No quedan duplicados" description="Las copias que apartaste están en Por revisar/Duplicados." action={<Button icon={ScanSearch} onClick={scan}>Buscar de nuevo</Button>} />
+          <EmptyState
+            icon={ShieldCheck}
+            title="No hay duplicados"
+            description={`No quedan copias idénticas en ${root?.name ?? 'esta carpeta'}. Lo que apartes queda en ${reviewFolder}/Duplicados.`}
+            action={
+              <Button icon={ScanSearch} onClick={() => setGroups(null)}>
+                Buscar en otra carpeta
+              </Button>
+            }
+          />
         </Panel>
       ) : (
         <>
@@ -154,7 +230,9 @@ export default function Duplicates() {
                   <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
                     <span className="text-[13px] font-medium text-text">{plural(g.files.length, 'archivo idéntico', 'archivos idénticos')}</span>
                     <span className="text-[12px] text-faint">· {formatBytes(g.size)} cada uno</span>
-                    <span className="ml-auto font-mono text-[11px] text-faint">hash {g.hash}</span>
+                    <span className="ml-auto font-mono text-[11px] text-faint" title={g.hash}>
+                      hash {g.hash.slice(0, 12)}
+                    </span>
                   </header>
                   <ul role="radiogroup" aria-label="Copia que se conserva">
                     {g.files.map((f) => {
@@ -197,7 +275,7 @@ export default function Duplicates() {
         onClose={() => setConfirm(false)}
         locked={moving}
         title={`Apartar ${plural(toMove.length, 'copia', 'copias')}`}
-        description="Se moverán a la carpeta Por revisar/Duplicados. No se elimina nada."
+        description={`Se moverán a ${quarantinePath}. No se elimina nada.`}
         width="sm"
         footer={
           <>

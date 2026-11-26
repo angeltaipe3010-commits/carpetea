@@ -20,11 +20,23 @@ pub fn execute(
     plan: &OrganizePlan,
     snapshot: &SnapshotMap,
     roots: &AllowedRoots,
+    progress: impl FnMut(ExecProgress),
+) -> Result<Operation, String> {
+    execute_kind("organize", db, plan, snapshot, roots, progress)
+}
+
+/// Igual que [`execute`], pero anotando otro tipo de operación (p. ej. `duplicates`).
+pub fn execute_kind(
+    kind: &str,
+    db: &Db,
+    plan: &OrganizePlan,
+    snapshot: &SnapshotMap,
+    roots: &AllowedRoots,
     mut progress: impl FnMut(ExecProgress),
 ) -> Result<Operation, String> {
     let mut op = Operation {
         id: new_id(),
-        kind: "organize".into(),
+        kind: kind.into(),
         created_at: now(),
         source: plan.source_path.clone(),
         destination: Some(plan.destination_label.clone()),

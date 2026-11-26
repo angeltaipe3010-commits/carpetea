@@ -23,6 +23,11 @@ pub struct Snapshot {
 
 pub type SnapshotMap = HashMap<String, Snapshot>;
 
+/// Oculto o de sistema según sus atributos (Windows).
+pub(crate) fn is_hidden_entry(e: &walkdir::DirEntry) -> bool {
+    e.metadata().map(|m| is_hidden(&m)).unwrap_or(false)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ScanError {
     #[error("Análisis cancelado.")]
@@ -197,7 +202,7 @@ pub fn scan(
 }
 
 const PROJECT_MARKERS: &[&str] = &["package.json", ".git", "cargo.toml", "pom.xml", "build.gradle", "pyproject.toml", "go.mod", "composer.json", ".sln", ".csproj"];
-const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target", "dist", "build", "bin", "obj", ".venv", "venv", "__pycache__", ".idea", ".vscode", ".next", ".claude"];
+pub(crate) const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target", "dist", "build", "bin", "obj", ".venv", "venv", "__pycache__", ".idea", ".vscode", ".next", ".claude"];
 
 /// Lee la estructura de carpetas existente bajo `root` (solo nombres, sin abrir archivos).
 /// Las carpetas de proyectos de código se marcan y no se recorren por dentro.

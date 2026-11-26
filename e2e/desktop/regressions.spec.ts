@@ -3,6 +3,7 @@
  * Comparte la ventana con organize.spec.ts (fixture por worker), así que cada
  * prueba deja el disco como lo encontró.
  */
+import { mkdirSync, writeFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
@@ -76,4 +77,48 @@ test('volver a analizar avisa antes de descartar cambios a mano', async ({ app }
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'Seguir editando' }).click()
   await expect(page.getByRole('button', { name: /Excluidos/ })).toContainText('1')
+})
+
+test('duplicados: encuentra copias por contenido, las aparta y deshacer las devuelve', async ({ app }) => {
+  const { page, sandbox } = app
+  // Dos copias de la factura con otros nombres (mismo contenido) y un archivo del mismo tamaño pero distinto.
+  const factura = sandbox.read('Origen', 'Factura_Luz_Noviembre_2026.pdf')
+  writeFileSync(sandbox.path('Origen', 'Factura_Luz_Noviembre_2026 (copia).pdf'), factura)
+  mkdirSync(sandbox.path('Origen', 'Viejo'), { recursive: true })
+  writeFileSync(sandbox.path('Origen', 'Viejo', 'factura.pdf'), factura)
+  writeFileSync(sandbox.path('Origen', 'otro.pdf'), 'x'.repeat(factura.length))
+
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Duplicados/ }).click()
+  await page.getByRole('radio', { name: /Pruebas E2E/ }).click()
+  await page.getByRole('button', { name: 'Buscar duplicados en Pruebas E2E' }).click()
+  await expect(page.getByText('3 archivos idénticos')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('otro.pdf')).toHaveCount(0)
+
+  await page.getByRole('button', { name: /^Apartar 2 copias$/ }).click()
+  await page.getByRole('dialog', { name: /Apartar 2 copias/ }).getByRole('button', { name: 'Apartar copias' }).click()
+  await expect(page.getByText('No hay duplicados')).toBeVisible({ timeout: 30_000 })
+  // Se conserva una sola copia fuera de la cuarentena; nada se borró.
+  expect(sandbox.list('Origen', 'Por revisar', 'Duplicados')).toHaveLength(2)
+
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Historial/ }).click()
+  await page.getByRole('button', { name: 'Deshacer', exact: true }).first().click()
+  await page.getByRole('dialog', { name: 'Deshacer operación' }).getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect(page.getByText('Deshecha', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(sandbox.exists('Origen', 'Viejo', 'factura.pdf')).toBe(true)
+  expect(sandbox.exists('Origen', 'Por revisar')).toBe(false)
+})
+
+test('ajustes y reglas sobreviven aunque se borren los datos del WebView', async ({ app }) => {
+  const { page } = app
+  await page.getByRole('link', { name: /^Configuración/ }).click()
+  const review = page.getByLabel('Nombre de la carpeta para revisar')
+  await review.fill('Revisar luego')
+  await review.blur()
+  // Se pierde todo lo del WebView (como al reinstalar) y se recarga.
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.getByRole('link', { name: /^Configuración/ }).click()
+  await expect(page.getByLabel('Nombre de la carpeta para revisar')).toHaveValue('Revisar luego')
+  await page.getByLabel('Nombre de la carpeta para revisar').fill('Por revisar')
+  await page.getByLabel('Nombre de la carpeta para revisar').blur()
 })

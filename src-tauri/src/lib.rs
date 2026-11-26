@@ -5,6 +5,7 @@
 
 mod classifier;
 mod db;
+mod duplicates;
 mod fsops;
 mod model;
 mod organizer;
@@ -28,6 +29,8 @@ struct AppState {
     db: Mutex<db::Db>,
     roots: AllowedRoots,
     snapshot: Mutex<SnapshotMap>,
+    /// Archivos de la última búsqueda de duplicados (solo esos se pueden apartar).
+    dup_snapshot: Mutex<SnapshotMap>,
     cancel: Arc<AtomicBool>,
     /// Hay una organización o un deshacer en curso (evita ejecutarlos dos veces).
     busy: AtomicBool,
@@ -239,6 +242,83 @@ async fn undo(state: State<'_, AppState>, op_id: String, on_progress: Channel<Ex
     })
 }
 
+/// Busca archivos con el mismo contenido dentro de `root` (solo lectura).
+#[tauri::command]
+async fn find_duplicates(
+    state: State<'_, AppState>,
+    root: String,
+    skip: Vec<String>,
+    on_progress: Channel<DuplicateProgress>,
+) -> Res<Vec<DuplicateGroup>> {
+    let root = PathBuf::from(root);
+    state.roots.check(&root)?;
+    if !root.is_dir() {
+        return Err("La carpeta ya no existe.".into());
+    }
+    state.cancel.store(false, Ordering::Relaxed);
+    let cancel = state.cancel.clone();
+    let skip: Vec<PathBuf> = skip.into_iter().map(PathBuf::from).collect();
+    let (groups, snap) = tauri::async_runtime::spawn_blocking(move || {
+        duplicates::find(&root, &skip, &cancel, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    *state.dup_snapshot.lock().unwrap() = snap;
+    Ok(groups)
+}
+
+/// Aparta las copias elegidas en `<root>/<carpeta para revisar>/Duplicados`.
+/// Es un movimiento normal: queda en el historial y se puede deshacer.
+#[tauri::command]
+async fn quarantine_duplicates(
+    state: State<'_, AppState>,
+    file_ids: Vec<String>,
+    root: String,
+    review_folder: String,
+    on_progress: Channel<ExecProgress>,
+) -> Res<Operation> {
+    let _busy = BusyGuard::take(&state.busy)?;
+    if safety::unsafe_segment(review_folder.trim()) {
+        return Err("El nombre de la carpeta para revisar no es válido.".into());
+    }
+    let root = PathBuf::from(root);
+    state.roots.check(&root)?;
+    let dest = root.join(review_folder.trim()).join("Duplicados");
+    let snapshot = state.dup_snapshot.lock().unwrap().clone();
+    let plan = duplicates::quarantine_plan(&file_ids, &snapshot, &root, &dest)?;
+    let db = state.db.lock().unwrap();
+    let op = organizer::execute_kind("duplicates", &db, &plan, &snapshot, &state.roots, |p| {
+        let _ = on_progress.send(p);
+    })?;
+    // Lo apartado ya no cuenta para la próxima búsqueda.
+    let mut snap = state.dup_snapshot.lock().unwrap();
+    for m in op.moves.iter().filter(|m| m.status == "moved") {
+        snap.remove(&m.file_id);
+    }
+    Ok(op)
+}
+
+/// Claves de preferencias que la interfaz puede guardar (nada más).
+const PREF_KEYS: &[&str] = &["deskflow:settings", "deskflow:rules"];
+
+#[tauri::command]
+fn pref_get(state: State<AppState>, key: String) -> Res<Option<String>> {
+    if !PREF_KEYS.contains(&key.as_str()) {
+        return Err("Clave no permitida.".into());
+    }
+    state.db.lock().unwrap().pref(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn pref_set(state: State<AppState>, key: String, value: String) -> Res<()> {
+    if !PREF_KEYS.contains(&key.as_str()) || value.len() > 1_000_000 {
+        return Err("Clave o valor no permitido.".into());
+    }
+    state.db.lock().unwrap().set_pref(&key, &value).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn history(state: State<AppState>) -> Res<HistorySnapshot> {
     state.db.lock().unwrap().snapshot(200).map_err(|e| e.to_string())
@@ -275,7 +355,7 @@ pub fn run() {
                     roots.allow(Path::new(&p));
                 }
             }
-            app.manage(AppState { db: Mutex::new(db), roots, snapshot: Mutex::new(SnapshotMap::new()), cancel: Arc::new(AtomicBool::new(false)), busy: AtomicBool::new(false) });
+            app.manage(AppState { db: Mutex::new(db), roots, snapshot: Mutex::new(SnapshotMap::new()), dup_snapshot: Mutex::new(SnapshotMap::new()), cancel: Arc::new(AtomicBool::new(false)), busy: AtomicBool::new(false) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -290,7 +370,11 @@ pub fn run() {
             cancel,
             execute,
             undo,
-            history
+            history,
+            pref_get,
+            pref_set,
+            find_duplicates,
+            quarantine_duplicates
         ])
         .run(tauri::generate_context!())
         .expect("error al iniciar DeskFlow");

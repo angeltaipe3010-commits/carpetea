@@ -1,6 +1,6 @@
 [package]
 name = "deskflow"
-version = "0.1.0"
+version = "1.0.0"
 description = "DeskFlow: organizador inteligente de archivos, local-first"
 authors = ["Angel Taipe"]
 license = ""
@@ -25,6 +25,7 @@ walkdir = "2"
 dirs = "5"
 chrono = "0.4"
 thiserror = "2"
+blake3 = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }

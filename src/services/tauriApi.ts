@@ -5,8 +5,7 @@
  */
 import { Channel, invoke } from '@tauri-apps/api/core'
 import type { DeskFlowApi } from '@/services/api'
-import { NotAvailableError } from '@/services/errors'
-import type { DirProbe, Environment, ExecProgress, IndexedFolderRaw, Operation, PickedFolder, ScanProgress, ScanResult, SourceFolder } from '@/types'
+import type { DirProbe, DuplicateGroup, DuplicateProgress, Environment, ExecProgress, IndexedFolderRaw, Operation, PickedFolder, ScanProgress, ScanResult, SourceFolder } from '@/types'
 
 function channel<T>(cb: (p: T) => void) {
   const ch = new Channel<T>()
@@ -63,11 +62,16 @@ export const tauriApi: DeskFlowApi = {
 
   loadHistory: () => call<{ operations: Operation[]; managed: string[] }>('history'),
 
-  findDuplicates: async () => {
-    throw new NotAvailableError('La búsqueda de duplicados')
+  async findDuplicates(root, skip, onProgress, signal) {
+    const onAbort = () => void call('cancel')
+    signal.addEventListener('abort', onAbort)
+    try {
+      return await call<DuplicateGroup[]>('find_duplicates', { root, skip, onProgress: channel<DuplicateProgress>(onProgress) })
+    } finally {
+      signal.removeEventListener('abort', onAbort)
+    }
   },
 
-  quarantineDuplicates: async () => {
-    throw new NotAvailableError('Apartar duplicados')
-  },
+  quarantineDuplicates: (fileIds, _groups, root, reviewFolder) =>
+    call<Operation>('quarantine_duplicates', { fileIds, root, reviewFolder, onProgress: channel<ExecProgress>(() => {}) }),
 }

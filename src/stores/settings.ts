@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { prefsStorage } from '@/services/prefs'
 import type { Destination, MotionPref, ThemePref } from '@/types'
 
-/** Preferencias. En el prototipo viven en localStorage; en la Fase 2 pasan a SQLite. */
+/** Preferencias: localStorage como copia de trabajo y SQLite como respaldo en escritorio (ver services/prefs). */
 interface SettingsState {
   theme: ThemePref
   motion: MotionPref
@@ -47,6 +48,6 @@ export const useSettings = create<SettingsState>()(
       removeExclusion: (path) => set((s) => ({ exclusions: s.exclusions.filter((e) => e !== path) })),
       reset: () => set(defaults),
     }),
-    { name: 'deskflow:settings' },
+    { name: 'deskflow:settings', storage: prefsStorage },
   ),
 )

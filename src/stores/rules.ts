@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { prefsStorage } from '@/services/prefs'
 import { DEFAULT_RULES } from '@/data/mock'
 import type { Rule } from '@/types'
 
@@ -35,6 +36,6 @@ export const useRules = create<RulesState>()(
           return { rules }
         }),
     }),
-    { name: 'deskflow:rules' },
+    { name: 'deskflow:rules', storage: prefsStorage },
   ),
 )

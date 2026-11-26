@@ -4,7 +4,7 @@
 
 DeskFlow es un organizador inteligente de archivos para escritorio (Windows primero). Analiza una carpeta, propone una estructura de carpetas y subcarpetas según su contenido real y no mueve nada hasta que el usuario lo confirma. Todo funciona en local.
 
-> **Estado: Fase 2 — app de escritorio con motor real.** Dentro de la app de escritorio (Tauri 2 + Rust), DeskFlow analiza, organiza y deshace operaciones sobre **carpetas reales**. En el navegador (`npm run dev`) sigue funcionando el prototipo con datos simulados. Duplicados y monitoreo todavía no están en la versión de escritorio y la interfaz lo indica.
+> **Estado: versión 1.0.** App de escritorio para Windows (Tauri 2 + Rust) que analiza, organiza, aparta duplicados y deshace operaciones sobre **carpetas reales**, con instalador propio. En el navegador (`npm run dev`) sigue funcionando el prototipo con datos simulados. El monitoreo de carpetas llega en una versión posterior.
 
 ## App de escritorio
 
@@ -30,23 +30,30 @@ Playwright se conecta a la ventana real de DeskFlow por CDP (WebView2 lo permite
 Cubre, por orden de riesgo:
 - No sobrescribir.
 - Archivos en uso o modificados tras el análisis.
-- Deshacer completo.
+- Deshacer completo (también de duplicados apartados).
 - Destinos sin permiso o en la nube.
 - "Usar mi estructura" y cursos nuevos.
+- Duplicados por contenido.
+- Ajustes y reglas que sobreviven a un borrado de los datos del WebView.
 
 ### Motor (`src-tauri/src`)
 
 | Módulo | Qué hace |
 |---|---|
-| `lib.rs` | Comandos Tauri: `environment`, `list_suggested_folders`, `pick_folder`, `probe_dirs`, `local_documents`, `scan`, `cancel`, `execute`, `undo`, `history` |
+| `lib.rs` | Comandos Tauri: `environment`, `list_suggested_folders`, `pick_folder`, `probe_dirs`, `local_documents`, `scan`, `index_structure`, `check_access`, `cancel`, `execute`, `undo`, `history`, `find_duplicates`, `quarantine_duplicates`, `pref_get`, `pref_set` |
 | `scanner.rs` | Recorre el origen leyendo solo metadatos. Omite ocultos, exclusiones, carpetas del sistema, descargas en curso y carpetas ya organizadas. Progreso por canal y cancelación |
 | `classifier.rs` | Port fiel de `src/services/classifier.ts`, con pruebas sobre los mismos casos |
 | `fsops.rs` | Mover sin sobrescribir nunca (`MoveFileExW` sin `REPLACE_EXISTING`). Entre unidades: copia a temporal, verifica tamaño, renombra y solo entonces borra el original |
 | `organizer.rs` | Ejecuta el plan confirmado y deshace. Solo mueve archivos del último análisis que no hayan cambiado; deshacer verifica tamaño y fecha antes de devolver cada archivo y retira las carpetas creadas que quedan vacías |
-| `db.rs` | Diario en SQLite (`deskflow.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas |
-| `safety.rs` | Detección de nube (raíces de OneDrive del sistema, nombres de clientes y atributos de archivos en la nube), rutas del sistema y carpetas autorizadas |
+| `duplicates.rs` | Duplicados por contenido en tres pasadas: tamaño, hash de los primeros 64 KiB y hash completo (BLAKE3). Las copias se apartan en `<carpeta>/Por revisar/Duplicados` con el mismo motor del organizador: nada se borra y se puede deshacer |
+| `db.rs` | Diario en SQLite (`deskflow.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas. También guarda carpetas autorizadas, carpetas gestionadas y una copia de las preferencias y reglas |
+| `safety.rs` | Detección de nube (raíces de OneDrive del sistema, nombres de clientes y atributos de archivos en la nube), rutas del sistema, carpetas autorizadas y nombres no válidos (`..`, `CON`, terminados en punto) |
 
 **Permisos:** la interfaz no tiene acceso al disco (ningún plugin de sistema de archivos). Rust solo opera en carpetas elegidas en el selector nativo o sugeridas por la app (Descargas, Escritorio, bibliotecas), y rechaza las del sistema y `AppData`.
+
+**Preferencias y reglas:** se leen de `localStorage` (sin parpadeo al abrir) y cada cambio se copia en SQLite. Si se borran los datos del WebView o se reinstala la app, al arrancar se recuperan de SQLite (`src/services/prefs.ts`).
+
+**Instalador:** `npm run tauri build` genera `DeskFlow_1.0.0_x64-setup.exe` (NSIS, en español, se instala para el usuario actual sin pedir permisos de administrador) y `DeskFlow_1.0.0_x64_es-ES.msi` en `src-tauri/target/release/bundle`. El icono sale de `src-tauri/app-icon.svg` (`npx tauri icon src-tauri/app-icon.svg`). El instalador no está firmado: Windows SmartScreen puede mostrar un aviso la primera vez.
 
 ---
 
@@ -165,16 +172,14 @@ src/
 
 ## Pendiente y riesgos
 
-- **Pendiente de probar a mano en la app de escritorio:** el motor tiene 16 pruebas automáticas que pasan, pero el flujo completo dentro de la ventana nativa (selector de Windows, análisis de una carpeta real, deshacer) aún no se ha recorrido. Conviene probarlo primero con una carpeta de prueba.
-- **Reglas y preferencias** siguen guardándose en el almacenamiento del WebView; el historial y las carpetas gestionadas ya están en SQLite. Falta migrar reglas y configuración.
-- **Duplicados y monitoreo de carpetas** no están en la versión de escritorio (la interfaz lo indica, sin datos de ejemplo).
+- **Monitoreo de carpetas** (organizar Descargas al llegar archivos nuevos) no está implementado; la interfaz lo marca como «Próximamente».
+- **Firma digital:** el instalador no está firmado. Firmarlo requiere un certificado de firma de código.
 - **Arrastrar carpetas desde el Explorador** a la ventana no está implementado. `dragDropEnabled` está en `false` para que funcione el arrastre interno del árbol.
-- **Icono propio:** los iconos de `src-tauri/icons` son los de Tauri. Hay que generarlos con `npx tauri icon` a partir del logo.
-- **Listas grandes:** la vista previa renderiza todos los archivos. Con miles de archivos hará falta virtualizar la lista (por ejemplo, `@tanstack/react-virtual`).
+- **Rutas de más de 260 caracteres** se rechazan con un aviso claro en lugar de usarse.
+- **Selector nativo de Windows («Examinar»):** el QA automático no puede manejarlo; se prueba a mano.
 - **Internacionalización:** los textos están en español dentro de los componentes. Antes de añadir inglés hay que extraerlos a un catálogo.
-- **Clasificación por contenido (niveles 4–5):** todavía no está implementada; hoy solo se usan extensión, nombre, fecha y reglas.
-- El bundle pesa unos 550 KB (175 KB comprimido). Para una app de escritorio es aceptable, pero se puede dividir por pantallas más adelante.
+- **Clasificación por contenido (niveles 4–5):** todavía no está implementada; hoy se usan extensión, nombre, fecha, reglas y tu estructura de carpetas.
 
 ## Siguiente fase recomendada
 
-**Cerrar la Fase 2 y pasar a la Fase 5.** Probar a mano el flujo en la app con una carpeta de prueba, mover reglas y preferencias a SQLite, poner el icono propio y generar el primer instalador (`npm run tauri build`). Después, detección de duplicados real (tamaño → hash parcial → hash completo) y clasificación por contenido de PDF y documentos.
+Monitoreo de carpetas con reglas de confianza alta, clasificación por contenido de PDF y documentos, y firma del instalador.

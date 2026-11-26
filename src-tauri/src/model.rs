@@ -250,3 +250,31 @@ pub struct HistorySnapshot {
     pub operations: Vec<Operation>,
     pub managed: Vec<String>,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateFile {
+    pub id: String,
+    pub name: String,
+    /// Carpeta que lo contiene.
+    pub path: String,
+    pub size: u64,
+    pub modified: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateGroup {
+    pub id: String,
+    pub hash: String,
+    pub size: u64,
+    pub files: Vec<DuplicateFile>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateProgress {
+    pub phase: &'static str,
+    pub processed: usize,
+    pub total: usize,
+}

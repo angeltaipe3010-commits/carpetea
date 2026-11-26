@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DeskFlow",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "app.deskflow.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -30,13 +30,33 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Angel Taipe",
+    "copyright": "© 2026 Angel Taipe",
+    "category": "Utility",
+    "shortDescription": "Organizador inteligente de archivos, local-first",
+    "longDescription": "DeskFlow analiza una carpeta, propone una estructura según tus carpetas y no mueve nada sin tu confirmación. Nunca borra ni sobrescribe, y todo se puede deshacer.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Spanish"
+        ],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": "es-ES"
+      }
+    }
   }
 }

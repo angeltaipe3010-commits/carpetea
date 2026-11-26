@@ -60,8 +60,10 @@ export interface DeskFlowApi {
   undo(op: Operation, onProgress: (p: ExecProgress) => void): Promise<Operation>
   /** Historial persistente (null en modo simulado: lo guarda el navegador). */
   loadHistory(): Promise<{ operations: Operation[]; managed: string[] } | null>
-  findDuplicates(onProgress: (p: DuplicateProgress) => void, signal: AbortSignal): Promise<DuplicateGroup[]>
-  quarantineDuplicates(fileIds: string[], groups: DuplicateGroup[]): Promise<Operation>
+  /** Busca contenido idéntico dentro de `root`. `skip`: carpetas a no recorrer (p. ej. la cuarentena). */
+  findDuplicates(root: string, skip: string[], onProgress: (p: DuplicateProgress) => void, signal: AbortSignal): Promise<DuplicateGroup[]>
+  /** Aparta las copias en `<root>/<reviewFolder>/Duplicados`. Nunca borra nada. */
+  quarantineDuplicates(fileIds: string[], groups: DuplicateGroup[], root: string, reviewFolder: string): Promise<Operation>
 }
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -221,7 +223,7 @@ const mockApi: DeskFlowApi = {
     return null
   },
 
-  async findDuplicates(onProgress, signal) {
+  async findDuplicates(_root, _skip, onProgress, signal) {
     const total = 1284
     const phases: DuplicateProgress['phase'][] = ['sizes', 'partial-hash', 'full-hash']
     for (const phase of phases) {
@@ -235,12 +237,12 @@ const mockApi: DeskFlowApi = {
     return DUPLICATE_GROUPS
   },
 
-  async quarantineDuplicates(fileIds, groups) {
+  async quarantineDuplicates(fileIds, groups, _root, reviewFolder) {
     await sleep(700)
     const all = groups.flatMap((g) => g.files)
     const moves: MoveRecord[] = fileIds.map((id) => {
       const f = all.find((x) => x.id === id)!
-      return { fileId: id, name: f.name, from: `${f.path}\\${f.name}`, to: `Por revisar/Duplicados/${f.name}`, status: 'moved' }
+      return { fileId: id, name: f.name, from: `${f.path}\\${f.name}`, to: `${reviewFolder}/Duplicados/${f.name}`, status: 'moved' }
     })
     return {
       id: uid('op'),
@@ -249,7 +251,7 @@ const mockApi: DeskFlowApi = {
       source: 'Varias ubicaciones',
       status: 'completed',
       moves,
-      foldersCreated: ['Por revisar/Duplicados'],
+      foldersCreated: [`${reviewFolder}/Duplicados`],
       errors: [],
     }
   },

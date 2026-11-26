@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS managed (
 CREATE TABLE IF NOT EXISTS allowed (
   path TEXT PRIMARY KEY
 );
+-- Preferencias y reglas (JSON). Sobreviven aunque se borren los datos del WebView.
+CREATE TABLE IF NOT EXISTS prefs (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 "#;
 
 pub fn now() -> String {
@@ -115,6 +120,18 @@ impl Db {
 
     pub fn remember_allowed(&self, path: &str) -> rusqlite::Result<()> {
         self.0.execute("INSERT OR IGNORE INTO allowed (path) VALUES (?1)", params![path])?;
+        Ok(())
+    }
+
+    pub fn pref(&self, key: &str) -> rusqlite::Result<Option<String>> {
+        self.0.query_row("SELECT value FROM prefs WHERE key = ?1", params![key], |r| r.get(0)).optional()
+    }
+
+    pub fn set_pref(&self, key: &str, value: &str) -> rusqlite::Result<()> {
+        self.0.execute(
+            "INSERT INTO prefs (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )?;
         Ok(())
     }
 
