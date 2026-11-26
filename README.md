@@ -73,7 +73,7 @@ npm run site          # actualiza versión, tamaño, SHA-256 y enlace de la Rele
 gh release create v1.0.0 src-tauri/target/release/bundle/nsis/DeskFlow_1.0.0_x64-setup.exe website/downloads/SHA256SUMS.txt
 ```
 
-Los botones de descarga apuntan al instalador de la [Release de GitHub](https://github.com/angeltaipe3010-commits/deskflow/releases) y el `.exe` no se guarda en git (`website/downloads/*.exe`). La web se despliega en Vercel: `vercel.json` le indica que sirva `website/` tal cual (sin instalar dependencias ni compilar), así que basta con importar el repositorio en Vercel y cada push a `main` la publica. Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
+Los botones de descarga apuntan al instalador de la [Release de GitHub](https://github.com/angeltaipe3010-commits/deskflow/releases) y el `.exe` no se guarda en git (`website/downloads/*.exe`). La web se despliega en Vercel: `vercel.json` copia `website/` a `dist/` y la sirve tal cual (sin instalar dependencias), así que basta con importar el repositorio en Vercel y cada push a `main` la publica. Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
 
 **Descarga:** [última versión](https://github.com/angeltaipe3010-commits/deskflow/releases/latest).
 
