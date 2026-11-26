@@ -13,7 +13,7 @@ Requisitos en Windows: Node.js 20+, [Rust](https://rustup.rs) (toolchain MSVC), 
 ```bash
 npm install
 npm run tauri dev      # abre la ventana de DeskFlow con el motor real
-npm run tauri build    # genera los instaladores (NSIS y MSI) en src-tauri/target/release/bundle
+npm run tauri build    # genera el instalador (NSIS) en src-tauri/target/release/bundle/nsis
 cd src-tauri && cargo test   # pruebas del motor en carpetas temporales
 npm run test:e2e       # QA de la app de escritorio real (Playwright)
 ```
@@ -45,7 +45,8 @@ Cubre, por orden de riesgo:
 | `classifier.rs` | Port fiel de `src/services/classifier.ts`, con pruebas sobre los mismos casos |
 | `fsops.rs` | Mover sin sobrescribir nunca (`MoveFileExW` sin `REPLACE_EXISTING`). Entre unidades: copia a temporal, verifica tamaño, renombra y solo entonces borra el original |
 | `organizer.rs` | Ejecuta el plan confirmado y deshace. Solo mueve archivos del último análisis que no hayan cambiado; deshacer verifica tamaño y fecha antes de devolver cada archivo y retira las carpetas creadas que quedan vacías |
-| `duplicates.rs` | Duplicados por contenido en tres pasadas: tamaño, hash de los primeros 64 KiB y hash completo (BLAKE3). Las copias se apartan en `<carpeta>/Por revisar/Duplicados` con el mismo motor del organizador: nada se borra y se puede deshacer |
+| `duplicates.rs` | Duplicados por contenido en tres pasadas: tamaño, hash de los primeros 64 KiB y hash completo (BLAKE3). No abre archivos que solo están en la nube (los descargaría), respeta las exclusiones y no entra en proyectos de código ni programas portables. Informa de lo que no pudo comparar. Las copias se apartan en `<carpeta>/Por revisar/Duplicados` con el motor del organizador (siempre queda una copia por grupo): nada se borra y se puede deshacer |
+| `logging.rs` | Registro local de errores y pánicos |
 | `db.rs` | Diario en SQLite (`deskflow.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas. También guarda carpetas autorizadas, carpetas gestionadas y una copia de las preferencias y reglas |
 | `safety.rs` | Detección de nube (raíces de OneDrive del sistema, nombres de clientes y atributos de archivos en la nube), rutas del sistema, carpetas autorizadas y nombres no válidos (`..`, `CON`, terminados en punto) |
 
@@ -53,7 +54,18 @@ Cubre, por orden de riesgo:
 
 **Preferencias y reglas:** se leen de `localStorage` (sin parpadeo al abrir) y cada cambio se copia en SQLite. Si se borran los datos del WebView o se reinstala la app, al arrancar se recuperan de SQLite (`src/services/prefs.ts`).
 
-**Instalador:** `npm run tauri build` genera `DeskFlow_1.0.0_x64-setup.exe` (NSIS, en español, se instala para el usuario actual sin pedir permisos de administrador) y `DeskFlow_1.0.0_x64_es-ES.msi` en `src-tauri/target/release/bundle`. El icono sale de `src-tauri/app-icon.svg` (`npx tauri icon src-tauri/app-icon.svg`). El instalador no está firmado: Windows SmartScreen puede mostrar un aviso la primera vez.
+**Instalador:** `npm run tauri build` genera `DeskFlow_1.0.0_x64-setup.exe` en `src-tauri/target/release/bundle/nsis` (en español, se instala para el usuario actual sin pedir permisos de administrador y muestra la licencia). Instala también `LICENSE.txt` y `THIRD_PARTY_NOTICES.txt` junto al programa. El icono sale de `src-tauri/app-icon.svg` (`npx tauri icon src-tauri/app-icon.svg`).
+
+**Antes de publicar una versión:**
+1. `npm run notices` para regenerar `THIRD_PARTY_NOTICES.txt` (licencias de npm y de las crates de Rust que van en el ejecutable).
+2. `npm run tauri build`.
+3. Publica junto al instalador su SHA-256 (`certutil -hashfile DeskFlow_1.0.0_x64-setup.exe SHA256`). El instalador no está firmado: Windows SmartScreen mostrará «Editor desconocido» la primera vez («Más información» → «Ejecutar de todas formas»), y la huella permite comprobar que el archivo es el original.
+
+**Registro de errores:** el motor y la interfaz escriben en `%LOCALAPPDATA%\app.deskflow.desktop\logs\deskflow.log` (incluidos los pánicos; se rota al superar 1 MB). Nunca se envía: en *Configuración → Acerca de* hay un botón para abrir la carpeta y adjuntarlo al pedir ayuda.
+
+## Licencia
+
+DeskFlow se distribuye con licencia [MIT](LICENSE): se ofrece tal cual, sin garantía. Las licencias del software de terceros que incluye están en `THIRD_PARTY_NOTICES.txt`.
 
 ---
 
@@ -173,7 +185,11 @@ src/
 ## Pendiente y riesgos
 
 - **Monitoreo de carpetas** (organizar Descargas al llegar archivos nuevos) no está implementado; la interfaz lo marca como «Próximamente».
-- **Firma digital:** el instalador no está firmado. Firmarlo requiere un certificado de firma de código.
+- **Firma digital:** el instalador no está firmado. Firmarlo (Azure Trusted Signing o un certificado OV) quita el aviso de SmartScreen y reduce falsos positivos de antivirus.
+- **Actualizaciones:** no hay comprobación automática de versiones nuevas (`tauri-plugin-updater`).
+- **Nombre:** existe otro proyecto de código abierto llamado Deskflow (compartir teclado y ratón) que también distribuye `deskflow.exe`. Conviene revisarlo antes de una difusión amplia.
+- **Migraciones de la base de datos:** el esquema aún no lleva versión (`PRAGMA user_version`); hará falta antes de cambiarlo en la 1.1.
+- **Dependencias:** `rusqlite` usa `libsqlite3-sys` 0.30 (aviso RUSTSEC-2026-0459, solo explotable con una base de datos manipulada en el propio equipo); actualizar en la próxima versión.
 - **Arrastrar carpetas desde el Explorador** a la ventana no está implementado. `dragDropEnabled` está en `false` para que funcione el arrastre interno del árbol.
 - **Rutas de más de 260 caracteres** se rechazan con un aviso claro en lugar de usarse.
 - **Selector nativo de Windows («Examinar»):** el QA automático no puede manejarlo; se prueba a mano.
@@ -182,4 +198,4 @@ src/
 
 ## Siguiente fase recomendada
 
-Monitoreo de carpetas con reglas de confianza alta, clasificación por contenido de PDF y documentos, y firma del instalador.
+Firma del instalador y actualizaciones automáticas; después, monitoreo de carpetas con reglas de confianza alta y clasificación por contenido de PDF y documentos.

@@ -15,6 +15,7 @@ import type {
   DirProbe,
   DuplicateGroup,
   DuplicateProgress,
+  DuplicateSearch,
   Environment,
   ExecProgress,
   IndexedFolderRaw,
@@ -61,7 +62,13 @@ export interface DeskFlowApi {
   /** Historial persistente (null en modo simulado: lo guarda el navegador). */
   loadHistory(): Promise<{ operations: Operation[]; managed: string[] } | null>
   /** Busca contenido idéntico dentro de `root`. `skip`: carpetas a no recorrer (p. ej. la cuarentena). */
-  findDuplicates(root: string, skip: string[], onProgress: (p: DuplicateProgress) => void, signal: AbortSignal): Promise<DuplicateGroup[]>
+  findDuplicates(
+    root: string,
+    skip: string[],
+    exclusions: string[],
+    onProgress: (p: DuplicateProgress) => void,
+    signal: AbortSignal,
+  ): Promise<DuplicateSearch>
   /** Aparta las copias en `<root>/<reviewFolder>/Duplicados`. Nunca borra nada. */
   quarantineDuplicates(fileIds: string[], groups: DuplicateGroup[], root: string, reviewFolder: string): Promise<Operation>
 }
@@ -223,7 +230,7 @@ const mockApi: DeskFlowApi = {
     return null
   },
 
-  async findDuplicates(_root, _skip, onProgress, signal) {
+  async findDuplicates(_root, _skip, _exclusions, onProgress, signal) {
     const total = 1284
     const phases: DuplicateProgress['phase'][] = ['sizes', 'partial-hash', 'full-hash']
     for (const phase of phases) {
@@ -234,7 +241,7 @@ const mockApi: DeskFlowApi = {
     }
     onProgress({ phase: 'done', processed: total, total })
     await sleep(160, signal)
-    return DUPLICATE_GROUPS
+    return { groups: DUPLICATE_GROUPS, scanned: total, skippedCloud: 0, skippedUnreadable: 0, skippedDenied: 0, cloud: null }
   },
 
   async quarantineDuplicates(fileIds, groups, _root, reviewFolder) {

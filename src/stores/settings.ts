@@ -32,7 +32,7 @@ const defaults = {
   recursive: true,
   reviewFolderName: 'Por revisar',
   skipHidden: true,
-  contentAnalysis: true,
+  contentAnalysis: false,
   destination: { mode: 'source', customPath: '' } as Destination,
   useStructure: true,
   exclusions: ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', '%APPDATA%', 'node_modules', '.git'],

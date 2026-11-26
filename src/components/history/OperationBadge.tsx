@@ -9,6 +9,7 @@ const MAP: Record<OperationStatus, { label: string; tone: 'success' | 'warning' 
   partial: { label: 'Con avisos', tone: 'warning', icon: TriangleExclamationPoint },
   failed: { label: 'Fallida', tone: 'danger', icon: CircleExclamationPoint },
   rolled_back: { label: 'Deshecha', tone: 'neutral', icon: RotateCcw },
+  partially_undone: { label: 'Deshecha en parte', tone: 'warning', icon: RotateCcw },
 }
 
 export function OperationBadge({ status }: { status: OperationStatus }) {

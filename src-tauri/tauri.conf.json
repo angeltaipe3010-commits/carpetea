@@ -31,8 +31,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "icon": [
       "icons/32x32.png",
@@ -53,10 +52,12 @@
           "Spanish"
         ],
         "displayLanguageSelector": false
-      },
-      "wix": {
-        "language": "es-ES"
       }
+    },
+    "licenseFile": "../LICENSE",
+    "resources": {
+      "../LICENSE": "LICENSE.txt",
+      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
     }
   }
 }

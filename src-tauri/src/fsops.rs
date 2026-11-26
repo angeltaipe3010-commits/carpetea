@@ -85,11 +85,26 @@ fn is_cross_device(e: &io::Error) -> bool {
     matches!(e.raw_os_error(), Some(17) | Some(18))
 }
 
+/// Quita o pone el atributo de solo lectura (Windows no deja escribir ni borrar con él).
+fn set_readonly(p: &Path, value: bool) -> io::Result<()> {
+    let mut perms = fs::metadata(p)?.permissions();
+    if perms.readonly() != value {
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(value);
+        fs::set_permissions(p, perms)?;
+    }
+    Ok(())
+}
+
 fn copy_verify_delete(src: &Path, dst: &Path) -> Result<(), MoveError> {
     let tmp = temp_name(dst);
     let expected = fs::metadata(src)?.len();
+    // `fs::copy` conserva el atributo de solo lectura; se quita mientras se verifica
+    // la copia y se vuelve a poner al final.
+    let readonly = fs::metadata(src)?.permissions().readonly();
     let result = (|| -> Result<(), MoveError> {
         fs::copy(src, &tmp)?;
+        set_readonly(&tmp, false)?;
         // FlushFileBuffers exige permiso de escritura en Windows.
         fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
         if fs::metadata(&tmp)?.len() != expected {
@@ -99,15 +114,23 @@ fn copy_verify_delete(src: &Path, dst: &Path) -> Result<(), MoveError> {
         Ok(())
     })();
     if let Err(e) = result {
+        let _ = set_readonly(&tmp, false);
         let _ = fs::remove_file(&tmp);
         return Err(e);
     }
     // El destino ya está completo y verificado: ahora sí se retira el original.
-    if let Err(e) = fs::remove_file(src) {
+    let removed = set_readonly(src, false).and_then(|_| fs::remove_file(src));
+    if let Err(e) = removed {
         // No se pudo borrar el original (p. ej. en uso): se deshace la copia
-        // para no duplicar el archivo.
+        // para no duplicar el archivo, y el original queda como estaba.
         let _ = fs::remove_file(dst);
+        if readonly {
+            let _ = set_readonly(src, true);
+        }
         return Err(classify_io(&e));
+    }
+    if readonly {
+        let _ = set_readonly(dst, true);
     }
     Ok(())
 }
@@ -202,6 +225,21 @@ mod tests {
         assert_eq!(fs::read_to_string(&b).unwrap(), "contenido");
         let leftovers: Vec<_> = fs::read_dir(b.parent().unwrap()).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().ends_with(".part")).collect();
         assert!(leftovers.is_empty());
+    }
+
+    #[test]
+    fn copy_path_handles_read_only_files() {
+        let t = crate::test_dir();
+        let a = t.path().join("solo-lectura.txt");
+        fs::write(&a, "contenido").unwrap();
+        set_readonly(&a, true).unwrap();
+        let b = t.path().join("destino").join("solo-lectura.txt");
+        fs::create_dir_all(b.parent().unwrap()).unwrap();
+        copy_verify_delete(&a, &b).unwrap();
+        assert!(!a.exists());
+        assert_eq!(fs::read_to_string(&b).unwrap(), "contenido");
+        assert!(fs::metadata(&b).unwrap().permissions().readonly(), "conserva el atributo");
+        set_readonly(&b, false).unwrap();
     }
 
     #[test]

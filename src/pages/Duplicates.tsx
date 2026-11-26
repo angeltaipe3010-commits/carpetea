@@ -15,7 +15,7 @@ import { categoryOf } from '@/services/classifier'
 import { useHistory } from '@/stores/history'
 import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/toasts'
-import type { DuplicateGroup, DuplicateProgress, SourceFolder } from '@/types'
+import type { DuplicateGroup, DuplicateProgress, DuplicateSearch, SourceFolder } from '@/types'
 import { winJoin } from '@/utils/destination'
 
 const PHASE_LABEL: Record<DuplicateProgress['phase'], string> = {
@@ -37,15 +37,22 @@ export default function Duplicates() {
   const addOp = useHistory((s) => s.add)
   const addManaged = useHistory((s) => s.addManaged)
   const reviewFolder = useSettings((s) => s.reviewFolderName)
+  const exclusions = useSettings((s) => s.exclusions)
+  const [info, setInfo] = useState<Omit<DuplicateSearch, 'groups'> | null>(null)
   const [folders, setFolders] = useState<SourceFolder[] | null>(null)
   const [root, setRoot] = useState<SourceFolder | null>(null)
   const quarantinePath = root ? winJoin(root.path, reviewFolder, 'Duplicados') : ''
 
   useEffect(() => {
-    api.listSuggestedFolders().then((list) => {
-      setFolders(list)
-      setRoot((r) => r ?? list[0] ?? null)
-    })
+    api
+      .listSuggestedFolders()
+      .then((list) => {
+        setFolders(list)
+        setRoot((r) => r ?? list[0] ?? null)
+      })
+      .catch(() => setFolders([]))
+    // Al salir de la pantalla se detiene la búsqueda en curso.
+    return () => controller.current?.abort()
   }, [])
 
   const browse = async () => {
@@ -69,7 +76,8 @@ export default function Duplicates() {
     setGroups(null)
     setProgress({ phase: 'sizes', processed: 0, total: 1 })
     try {
-      const g = await api.findDuplicates(root.path, [quarantinePath], setProgress, controller.current.signal)
+      const { groups: g, ...rest } = await api.findDuplicates(root.path, [quarantinePath], exclusions, setProgress, controller.current.signal)
+      setInfo(rest)
       // Sugerencia: conservar la copia más antigua (suele ser la original).
       const k: Keep = {}
       for (const grp of g) k[grp.id] = [...grp.files].sort((a, b) => a.modified.localeCompare(b.modified))[0].id
@@ -132,7 +140,7 @@ export default function Duplicates() {
             <div>
               <h2 className="text-[14px] font-semibold text-text">{PHASE_LABEL[progress.phase]}</h2>
               <p className="mt-0.5 text-[12.5px] text-muted tabular-nums">
-                {progress.processed} de {progress.total} archivos
+                {progress.phase === 'sizes' ? `${progress.processed} archivos revisados` : `${progress.processed} de ${progress.total} archivos`}
               </p>
             </div>
             <Button variant="ghost" size="sm" icon={X} onClick={() => controller.current?.abort()}>
@@ -192,6 +200,7 @@ export default function Duplicates() {
         </Panel>
       ) : groups.length === 0 ? (
         <Panel>
+          <SearchNotice info={info} reviewFolder={reviewFolder} className="m-4 mb-0" />
           <EmptyState
             icon={ShieldCheck}
             title="No hay duplicados"
@@ -223,6 +232,7 @@ export default function Duplicates() {
             </Button>
           </Panel>
 
+          <SearchNotice info={info} reviewFolder={reviewFolder} />
           <motion.div variants={list} initial="initial" animate="animate" className="space-y-3">
             {groups.map((g) => (
               <motion.section key={g.id} variants={listItem}>
@@ -288,6 +298,11 @@ export default function Duplicates() {
           </>
         }
       >
+        {info?.cloud && (
+          <p role="alert" className="mb-3 rounded-lg border border-warning/40 bg-warning-soft px-3 py-2 text-[12.5px] text-text">
+            {root?.name} se sincroniza con {info.cloud}: la carpeta {reviewFolder}/Duplicados y los cambios también se sincronizarán.
+          </p>
+        )}
         <ul className="space-y-1.5 text-[12.5px] text-muted">
           <li className="flex gap-2">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
@@ -300,5 +315,29 @@ export default function Duplicates() {
         </ul>
       </Dialog>
     </Page>
+  )
+}
+
+/** Lo que no se pudo comparar: nunca se oculta (un «no hay duplicados» podría no ser cierto). */
+function SearchNotice({
+  info,
+  reviewFolder,
+  className,
+}: {
+  info: Omit<DuplicateSearch, 'groups'> | null
+  reviewFolder: string
+  className?: string
+}) {
+  if (!info) return null
+  const parts = [
+    info.skippedCloud && `${plural(info.skippedCloud, 'archivo está', 'archivos están')} solo en la nube y no se abrieron para no descargarlos`,
+    info.skippedUnreadable && `${plural(info.skippedUnreadable, 'archivo no se pudo', 'archivos no se pudieron')} leer (en uso o sin permiso)`,
+    info.skippedDenied && `${plural(info.skippedDenied, 'elemento', 'elementos')} sin acceso`,
+  ].filter(Boolean)
+  return (
+    <div className={cn('mb-4 rounded-xl border border-border bg-surface-2/60 px-4 py-3 text-[12.5px] text-muted', className)}>
+      Se revisaron {plural(info.scanned, 'archivo', 'archivos')}. No se tocan carpetas de programas o proyectos de código, tus exclusiones ni {reviewFolder}/Duplicados.
+      {parts.length > 0 && <span className="mt-1 block text-text">Sin comparar: {parts.join('; ')}.</span>}
+    </div>
   )
 }

@@ -7,6 +7,7 @@ mod classifier;
 mod db;
 mod duplicates;
 mod fsops;
+mod logging;
 mod model;
 mod organizer;
 mod safety;
@@ -30,7 +31,9 @@ struct AppState {
     roots: AllowedRoots,
     snapshot: Mutex<SnapshotMap>,
     /// Archivos de la última búsqueda de duplicados (solo esos se pueden apartar).
-    dup_snapshot: Mutex<SnapshotMap>,
+    dup_found: Mutex<duplicates::Found>,
+    /// Cancelación propia: no se mezcla con la del análisis.
+    dup_cancel: Arc<AtomicBool>,
     cancel: Arc<AtomicBool>,
     /// Hay una organización o un deshacer en curso (evita ejecutarlos dos veces).
     busy: AtomicBool,
@@ -228,45 +231,104 @@ async fn execute(state: State<'_, AppState>, plan: OrganizePlan, on_progress: Ch
     let _busy = BusyGuard::take(&state.busy)?;
     let snapshot = state.snapshot.lock().unwrap().clone();
     let db = state.db.lock().unwrap();
-    organizer::execute(&db, &plan, &snapshot, &state.roots, |p| {
+    let op = organizer::execute(&db, &plan, &snapshot, &state.roots, |p| {
         let _ = on_progress.send(p);
-    })
+    });
+    logged("organizar", op)
 }
 
 #[tauri::command]
 async fn undo(state: State<'_, AppState>, op_id: String, on_progress: Channel<ExecProgress>) -> Res<Operation> {
     let _busy = BusyGuard::take(&state.busy)?;
     let db = state.db.lock().unwrap();
-    organizer::undo(&db, &op_id, |p| {
+    let op = organizer::undo(&db, &op_id, |p| {
         let _ = on_progress.send(p);
-    })
+    });
+    logged("deshacer", op)
+}
+
+/// Anota en el registro los errores y los avisos de una operación.
+fn logged(context: &str, r: Res<Operation>) -> Res<Operation> {
+    match &r {
+        Ok(op) if !op.errors.is_empty() => logging::write("WARN", &format!("{context} {}: {}", op.id, op.errors.join(" | "))),
+        Err(e) => logging::error(context, e),
+        _ => {}
+    }
+    r
+}
+
+/// Errores de la interfaz, para el mismo registro.
+#[tauri::command]
+fn log_event(level: String, message: String) {
+    let level = match level.as_str() {
+        "error" => "UI-ERROR",
+        "warn" => "UI-WARN",
+        _ => "UI-INFO",
+    };
+    logging::write(level, &message.chars().take(8000).collect::<String>());
+}
+
+/// Abre la licencia o los avisos de terceros (instalados junto al programa).
+#[tauri::command]
+fn open_document(app: AppHandle, name: String) -> Res<()> {
+    if !["LICENSE.txt", "THIRD_PARTY_NOTICES.txt"].contains(&name.as_str()) {
+        return Err("Documento no disponible.".into());
+    }
+    let path = app.path().resource_dir().map_err(|e| e.to_string())?.join(&name);
+    if !path.is_file() {
+        return Err(format!("No se encontró {name}."));
+    }
+    std::process::Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Abre la carpeta de registros en el Explorador (para enviarlos al pedir ayuda).
+#[tauri::command]
+fn open_log_dir() -> Res<()> {
+    let dir = logging::dir().ok_or("No hay carpeta de registros.")?;
+    std::process::Command::new("explorer").arg(&dir).spawn().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Busca archivos con el mismo contenido dentro de `root` (solo lectura).
+/// Los archivos que solo están en la nube no se abren (se descargarían).
 #[tauri::command]
 async fn find_duplicates(
     state: State<'_, AppState>,
     root: String,
     skip: Vec<String>,
+    exclusions: Vec<String>,
     on_progress: Channel<DuplicateProgress>,
-) -> Res<Vec<DuplicateGroup>> {
+) -> Res<DuplicateSearch> {
     let root = PathBuf::from(root);
     state.roots.check(&root)?;
     if !root.is_dir() {
         return Err("La carpeta ya no existe.".into());
     }
-    state.cancel.store(false, Ordering::Relaxed);
-    let cancel = state.cancel.clone();
+    state.dup_cancel.store(false, Ordering::Relaxed);
+    let cancel = state.dup_cancel.clone();
     let skip: Vec<PathBuf> = skip.into_iter().map(PathBuf::from).collect();
-    let (groups, snap) = tauri::async_runtime::spawn_blocking(move || {
-        duplicates::find(&root, &skip, &cancel, |p| {
+    let cloud = cloud_provider(&root);
+    let (mut search, found) = tauri::async_runtime::spawn_blocking(move || {
+        duplicates::find(&root, &skip, &exclusions, &cancel, |p| {
             let _ = on_progress.send(p);
         })
     })
     .await
-    .map_err(|e| e.to_string())??;
-    *state.dup_snapshot.lock().unwrap() = snap;
-    Ok(groups)
+    .map_err(|e| e.to_string())?
+    .inspect_err(|e| {
+        if !e.contains("cancelad") {
+            logging::error("buscar duplicados", e)
+        }
+    })?;
+    search.cloud = cloud;
+    *state.dup_found.lock().unwrap() = found;
+    Ok(search)
+}
+
+#[tauri::command]
+fn cancel_duplicates(state: State<AppState>) {
+    state.dup_cancel.store(true, Ordering::Relaxed);
 }
 
 /// Aparta las copias elegidas en `<root>/<carpeta para revisar>/Duplicados`.
@@ -286,16 +348,21 @@ async fn quarantine_duplicates(
     let root = PathBuf::from(root);
     state.roots.check(&root)?;
     let dest = root.join(review_folder.trim()).join("Duplicados");
-    let snapshot = state.dup_snapshot.lock().unwrap().clone();
-    let plan = duplicates::quarantine_plan(&file_ids, &snapshot, &root, &dest)?;
+    let found = state.dup_found.lock().unwrap().clone();
+    let plan = duplicates::quarantine_plan(&file_ids, &found, &root, &dest)?;
+    let snapshot = found.snapshot;
     let db = state.db.lock().unwrap();
-    let op = organizer::execute_kind("duplicates", &db, &plan, &snapshot, &state.roots, |p| {
-        let _ = on_progress.send(p);
-    })?;
+    let op = logged(
+        "apartar duplicados",
+        organizer::execute_kind("duplicates", &db, &plan, &snapshot, &state.roots, |p| {
+            let _ = on_progress.send(p);
+        }),
+    )?;
     // Lo apartado ya no cuenta para la próxima búsqueda.
-    let mut snap = state.dup_snapshot.lock().unwrap();
+    let mut found = state.dup_found.lock().unwrap();
     for m in op.moves.iter().filter(|m| m.status == "moved") {
-        snap.remove(&m.file_id);
+        found.snapshot.remove(&m.file_id);
+        found.group_of.remove(&m.file_id);
     }
     Ok(op)
 }
@@ -343,7 +410,13 @@ pub fn run() {
                 None => app.path().app_data_dir()?,
             };
             std::fs::create_dir_all(&dir)?;
-            let db = db::Db::open(&dir.join("deskflow.db"))?;
+            let log_dir = if cfg!(debug_assertions) && std::env::var_os("DESKFLOW_DATA_DIR").is_some() {
+                dir.join("logs")
+            } else {
+                app.path().app_log_dir()?
+            };
+            logging::init(&log_dir);
+            let db = db::Db::open(&dir.join("deskflow.db")).inspect_err(|e| logging::error("abrir la base de datos", &e.to_string()))?;
             // Modo de pruebas: el motor queda encerrado en la carpeta de pruebas.
             let roots = match e2e_root() {
                 Some(root) => AllowedRoots::jailed(&root),
@@ -355,7 +428,7 @@ pub fn run() {
                     roots.allow(Path::new(&p));
                 }
             }
-            app.manage(AppState { db: Mutex::new(db), roots, snapshot: Mutex::new(SnapshotMap::new()), dup_snapshot: Mutex::new(SnapshotMap::new()), cancel: Arc::new(AtomicBool::new(false)), busy: AtomicBool::new(false) });
+            app.manage(AppState { db: Mutex::new(db), roots, snapshot: Mutex::new(SnapshotMap::new()), dup_found: Mutex::new(duplicates::Found::default()), dup_cancel: Arc::new(AtomicBool::new(false)), cancel: Arc::new(AtomicBool::new(false)), busy: AtomicBool::new(false) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -374,6 +447,10 @@ pub fn run() {
             pref_get,
             pref_set,
             find_duplicates,
+            cancel_duplicates,
+            log_event,
+            open_log_dir,
+            open_document,
             quarantine_duplicates
         ])
         .run(tauri::generate_context!())

@@ -122,6 +122,22 @@ fn has_cloud_attributes(_path: &Path) -> bool {
     false
 }
 
+/// Archivo que solo está en la nube (marcador de OneDrive y similares):
+/// leerlo lo descargaría, así que no se abre.
+#[cfg(windows)]
+pub fn is_cloud_only(m: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const OFFLINE: u32 = 0x0000_1000;
+    const RECALL_ON_OPEN: u32 = 0x0004_0000;
+    const RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+    m.file_attributes() & (OFFLINE | RECALL_ON_OPEN | RECALL_ON_DATA_ACCESS) != 0
+}
+
+#[cfg(not(windows))]
+pub fn is_cloud_only(_m: &std::fs::Metadata) -> bool {
+    false
+}
+
 /// Carpetas que nunca se analizan ni se usan como destino.
 pub fn is_system_path(path: &Path) -> bool {
     let n = norm(path);

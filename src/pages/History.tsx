@@ -15,7 +15,9 @@ import { useHistory } from '@/stores/history'
 import { toast } from '@/stores/toasts'
 import type { ExecProgress, MoveRecord, Operation } from '@/types'
 
-const canUndo = (op: Operation) => (op.status === 'completed' || op.status === 'partial') && !op.undoneAt && op.moves.some((m) => m.status === 'moved')
+const pendingUndo = (op: Operation) => op.moves.filter((m) => m.status === 'moved' || m.status === 'not_restored')
+const canUndo = (op: Operation) =>
+  (op.status === 'completed' || op.status === 'partial' || op.status === 'partially_undone') && !op.undoneAt && pendingUndo(op).length > 0
 
 export default function History() {
   const navigate = useNavigate()
@@ -39,8 +41,8 @@ export default function History() {
       return
     }
     replace(result)
-    // Lo deshecho ya no cuenta como organizado: se analizará de nuevo.
-    removeManaged(undoing.foldersCreated)
+    // Lo deshecho del todo ya no cuenta como organizado: se analizará de nuevo.
+    if (result.status === 'rolled_back') removeManaged(undoing.foldersCreated)
     setProgress(null)
     setUndoing(null)
     const restored = result.moves.filter((m) => m.status === 'restored').length
@@ -48,7 +50,9 @@ export default function History() {
     toast({
       tone: pending ? 'warning' : 'success',
       title: `${plural(restored, 'archivo restaurado', 'archivos restaurados')}`,
-      description: pending ? `${plural(pending, 'archivo se quedó', 'archivos se quedaron')} donde estaba: cambió, se movió o su sitio original está ocupado. Mira el detalle en el historial.` : 'Todo volvió a su ubicación original.',
+      description: pending
+        ? `${plural(pending, 'archivo se quedó', 'archivos se quedaron')} donde estaba (cambió, está en uso o su sitio original está ocupado). Puedes reintentarlo desde el historial.`
+        : 'Todo volvió a su ubicación original.',
     })
   }
 
@@ -129,7 +133,7 @@ export default function History() {
                             <span className="ml-auto">
                               {canUndo(op) ? (
                                 <Button size="sm" icon={RotateCcw} onClick={() => setUndoing(op)} disabled={op.sample}>
-                                  Deshacer
+                                  {op.status === 'partially_undone' ? 'Reintentar deshacer' : 'Deshacer'}
                                 </Button>
                               ) : null}
                             </span>
@@ -180,7 +184,7 @@ export default function History() {
         onClose={() => setUndoing(null)}
         locked={!!progress}
         title="Deshacer operación"
-        description={undoing ? `Se devolverán ${plural(undoing.moves.filter((m) => m.status === 'moved').length, 'archivo', 'archivos')} a ${folderName(undoing.source)}.` : ''}
+        description={undoing ? `Se devolverán ${plural(pendingUndo(undoing).length, 'archivo', 'archivos')} a ${folderName(undoing.source)}.` : ''}
         width="sm"
         footer={
           progress ? null : (

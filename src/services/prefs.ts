@@ -9,6 +9,7 @@
  */
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { createJSONStorage, type StateStorage } from 'zustand/middleware'
+import { reportError } from './log'
 
 export const PREF_KEYS = ['deskflow:settings', 'deskflow:rules'] as const
 
@@ -17,8 +18,13 @@ const native = isTauri()
 const mirrored: StateStorage = {
   getItem: (name) => localStorage.getItem(name),
   setItem: (name, value) => {
-    localStorage.setItem(name, value)
-    if (native) void invoke('pref_set', { key: name, value }).catch((e) => console.error('[deskflow] pref_set', e))
+    // SQLite primero: si localStorage está lleno o falla, el cambio no se pierde.
+    if (native) void invoke('pref_set', { key: name, value }).catch((e) => reportError('pref_set', e))
+    try {
+      localStorage.setItem(name, value)
+    } catch (e) {
+      reportError('localStorage.setItem', e)
+    }
   },
   removeItem: (name) => localStorage.removeItem(name),
 }
@@ -41,11 +47,12 @@ export async function restorePrefs(): Promise<string[]> {
         if (local === null && saved !== null) {
           localStorage.setItem(key, saved)
           restored.push(key)
-        } else if (local !== null && saved === null) {
+        } else if (local !== null && local !== saved) {
+          // localStorage es la copia de trabajo: si difiere, SQLite se pone al día.
           await invoke('pref_set', { key, value: local })
         }
       } catch (e) {
-        console.error('[deskflow] restorePrefs', key, e)
+        reportError('restorePrefs', e)
       }
     }),
   )

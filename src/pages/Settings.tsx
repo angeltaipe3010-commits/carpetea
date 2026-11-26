@@ -1,7 +1,11 @@
 import { folderNameProblem } from '@/utils/names'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
-import { Lock, Monitor, Moon, Plus, Sun, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { getVersion } from '@tauri-apps/api/app'
+import { invoke } from '@tauri-apps/api/core'
+import { FileText, FolderOpen, Lock, Monitor, Moon, Plus, Sun, X } from 'lucide-react'
+import { isNative } from '@/services/api'
+import { openLogFolder } from '@/services/log'
 import { Page, PageHeader } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
 import { Badge, Input, Panel, Segmented, Select, Switch } from '@/components/ui/primitives'
@@ -12,6 +16,12 @@ import { toast } from '@/stores/toasts'
 export default function Settings() {
   const s = useSettings()
   const [exclusion, setExclusion] = useState('')
+  const [version, setVersion] = useState<string | null>(isNative ? null : 'prototipo')
+  useEffect(() => {
+    if (isNative) getVersion().then(setVersion).catch(() => setVersion(null))
+  }, [])
+  const openDoc = (name: string) =>
+    invoke('open_document', { name }).catch((e) => toast({ tone: 'danger', title: 'No se pudo abrir', description: String(e) }))
 
   return (
     <Page>
@@ -130,8 +140,15 @@ export default function Settings() {
         </Section>
 
         <Section title="Privacidad">
-          <Row label="Análisis de contenido local" hint="Lee el texto de PDF y documentos compatibles para clasificarlos mejor. Nunca sale de tu equipo.">
-            <Switch checked={s.contentAnalysis} onChange={(v) => s.set({ contentAnalysis: v })} label="Análisis de contenido local" />
+          <Row
+            label={
+              <span className="flex items-center gap-2">
+                Análisis de contenido local <Badge>Próximamente</Badge>
+              </span>
+            }
+            hint="Leerá el texto de PDF y documentos para clasificarlos mejor, sin que salga de tu equipo. Hoy DeskFlow usa solo el nombre, el tipo, la fecha, tus reglas y tus carpetas."
+          >
+            <Switch checked={false} onChange={() => {}} label="Análisis de contenido local" disabled />
           </Row>
           <Row
             label={
@@ -147,6 +164,31 @@ export default function Settings() {
             <Lock className="mt-0.5 size-3.5 shrink-0 text-success" />
             DeskFlow funciona sin conexión y no envía archivos, nombres ni estadísticas a ningún servidor. Si eliges un destino sincronizado con OneDrive, Google Drive, Dropbox o iCloud, te pedirá confirmación; si no la das, usará una carpeta Documentos local.
           </div>
+        </Section>
+
+        <Section title="Acerca de DeskFlow">
+          <Row label="Versión" hint="Organizador de archivos local. Licencia MIT: se ofrece tal cual, sin garantía.">
+            <span className="text-[13px] text-muted tabular-nums">{version ?? '—'}</span>
+          </Row>
+          {isNative && (
+            <>
+              <Row label="Licencia y avisos de terceros" hint="Las licencias del software de código abierto que incluye DeskFlow.">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" icon={FileText} onClick={() => openDoc('LICENSE.txt')}>
+                    Licencia
+                  </Button>
+                  <Button size="sm" icon={FileText} onClick={() => openDoc('THIRD_PARTY_NOTICES.txt')}>
+                    Avisos de terceros
+                  </Button>
+                </div>
+              </Row>
+              <Row label="Registro de errores" hint="Si algo falla, este archivo ayuda a encontrar la causa. Se guarda solo en tu equipo; nunca se envía.">
+                <Button size="sm" icon={FolderOpen} onClick={() => openLogFolder().catch((e) => toast({ tone: 'danger', title: 'No se pudo abrir', description: String(e) }))}>
+                  Abrir carpeta de registros
+                </Button>
+              </Row>
+            </>
+          )}
         </Section>
 
         <div className="flex justify-end">

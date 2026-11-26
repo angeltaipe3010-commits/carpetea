@@ -87,12 +87,17 @@ test('duplicados: encuentra copias por contenido, las aparta y deshacer las devu
   mkdirSync(sandbox.path('Origen', 'Viejo'), { recursive: true })
   writeFileSync(sandbox.path('Origen', 'Viejo', 'factura.pdf'), factura)
   writeFileSync(sandbox.path('Origen', 'otro.pdf'), 'x'.repeat(factura.length))
+  // Una copia dentro de un proyecto de código: nunca se propone apartarla.
+  mkdirSync(sandbox.path('Origen', 'MiApp'), { recursive: true })
+  writeFileSync(sandbox.path('Origen', 'MiApp', 'package.json'), '{}')
+  writeFileSync(sandbox.path('Origen', 'MiApp', 'factura.pdf'), factura)
 
   await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Duplicados/ }).click()
   await page.getByRole('radio', { name: /Pruebas E2E/ }).click()
   await page.getByRole('button', { name: 'Buscar duplicados en Pruebas E2E' }).click()
   await expect(page.getByText('3 archivos idénticos')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('otro.pdf')).toHaveCount(0)
+  await expect(page.getByText(/No se tocan carpetas de programas o proyectos/)).toBeVisible()
 
   await page.getByRole('button', { name: /^Apartar 2 copias$/ }).click()
   await page.getByRole('dialog', { name: /Apartar 2 copias/ }).getByRole('button', { name: 'Apartar copias' }).click()
@@ -106,6 +111,7 @@ test('duplicados: encuentra copias por contenido, las aparta y deshacer las devu
   await expect(page.getByText('Deshecha', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
   expect(sandbox.exists('Origen', 'Viejo', 'factura.pdf')).toBe(true)
   expect(sandbox.exists('Origen', 'Por revisar')).toBe(false)
+  expect(sandbox.exists('Origen', 'MiApp', 'factura.pdf')).toBe(true)
 })
 
 test('ajustes y reglas sobreviven aunque se borren los datos del WebView', async ({ app }) => {
@@ -114,6 +120,13 @@ test('ajustes y reglas sobreviven aunque se borren los datos del WebView', async
   const review = page.getByLabel('Nombre de la carpeta para revisar')
   await review.fill('Revisar luego')
   await review.blur()
+  // Y una regla desactivada.
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Reglas/ }).click()
+  const firstRule = page.getByRole('switch', { name: /^Activar / }).first()
+  const ruleName = await firstRule.getAttribute('aria-label')
+  await expect(firstRule).toBeChecked()
+  await firstRule.click()
+  await expect(firstRule).not.toBeChecked()
   // Se pierde todo lo del WebView (como al reinstalar) y se recarga.
   await page.evaluate(() => localStorage.clear())
   await page.reload()
@@ -121,4 +134,8 @@ test('ajustes y reglas sobreviven aunque se borren los datos del WebView', async
   await expect(page.getByLabel('Nombre de la carpeta para revisar')).toHaveValue('Revisar luego')
   await page.getByLabel('Nombre de la carpeta para revisar').fill('Por revisar')
   await page.getByLabel('Nombre de la carpeta para revisar').blur()
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Reglas/ }).click()
+  const rule = page.getByRole('switch', { name: ruleName! })
+  await expect(rule).not.toBeChecked()
+  await rule.click()
 })

@@ -82,11 +82,24 @@ pub fn execute_kind(
             created.extend(made);
             // El plan ya resolvió los conflictos conocidos; si apareció uno nuevo, se busca otro nombre libre.
             let (target, note) = if to.exists() {
-                let free = free_name(dir, &m.final_name);
+                // El nombre sale de `to` (ya validado), nunca de un campo aparte de la interfaz.
+                let name = to.file_name().ok_or("Destino no válido.")?.to_string_lossy().to_string();
+                let free = free_name(dir, &name);
                 (free, Some("Apareció un archivo con el mismo nombre; se guardó con otro.".to_string()))
             } else {
                 (to.clone(), None)
             };
+            // Última comprobación sobre la ruta real que se va a usar.
+            if has_unsafe_segment(&target) {
+                return Err("El destino tiene un nombre de carpeta no válido.".into());
+            }
+            roots.check(&target)?;
+            // Se anota el destino real antes de mover: si la app se cierra justo después,
+            // la recuperación busca el archivo donde de verdad está.
+            if target != to {
+                let pending = MoveRecord { to: target.display().to_string(), ..rec.clone() };
+                db.update_move(&op.id, seq, &pending, None).map_err(|e| e.to_string())?;
+            }
             move_file(&snap.path, &target).map_err(|e| e.to_string())?;
             Ok((target, note))
         })();
@@ -129,7 +142,14 @@ pub fn undo(db: &Db, op_id: &str, mut progress: impl FnMut(ExecProgress)) -> Res
     if op.undone_at.is_some() {
         return Err("Esta operación ya se deshizo.".into());
     }
-    let targets: Vec<usize> = op.moves.iter().enumerate().filter(|(_, m)| m.status == "moved").map(|(i, _)| i).collect();
+    // También se reintentan los que no se pudieron devolver la vez anterior (p. ej. estaban abiertos).
+    let targets: Vec<usize> = op
+        .moves
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.status == "moved" || m.status == "not_restored")
+        .map(|(i, _)| i)
+        .collect();
     let total = targets.len();
     let mut not_restored = 0;
 
@@ -178,8 +198,13 @@ pub fn undo(db: &Db, op_id: &str, mut progress: impl FnMut(ExecProgress)) -> Res
     }
 
     progress(ExecProgress { done: total, total, current: String::new() });
+    op.errors.retain(|e| !e.contains("no se restauraron"));
     if not_restored > 0 {
-        op.errors.push(format!("{not_restored} archivo(s) no se restauraron: cambiaron, se movieron o su ubicación original está ocupada. Revisa el detalle de cada archivo."));
+        // Queda pendiente: se puede volver a intentar y la carpeta sigue contando como organizada.
+        op.errors.push(format!("{not_restored} archivo(s) no se restauraron: cambiaron, se movieron, están en uso o su ubicación original está ocupada. Puedes volver a intentarlo."));
+        op.status = "partially_undone".into();
+        db.finish(&op).map_err(|e| e.to_string())?;
+        return Ok(op);
     }
     op.status = "rolled_back".into();
     op.undone_at = Some(now());
@@ -246,6 +271,28 @@ mod tests {
     }
 
     #[test]
+    fn final_name_from_the_ui_cannot_escape_the_destination() {
+        let (t, src, dst) = setup();
+        let db = Db::memory();
+        let roots = AllowedRoots::default();
+        roots.allow(&dst);
+        let (_, snap) = scan(&src, &opts(), &[], &[], &AtomicBool::new(false), |_| {}).unwrap();
+        let mut plan = plan_for(&src, &dst, &snap);
+        // Conflicto nuevo en el destino + un final_name malicioso (ruta absoluta y "..").
+        fs::create_dir_all(dst.join("Docs")).unwrap();
+        fs::write(dst.join("Docs").join("foto.jpg"), "otra").unwrap();
+        for m in &mut plan.moves {
+            m.final_name = t.path().join("fuera").join("..").join("escapado.jpg").display().to_string();
+        }
+        let op = execute(&db, &plan, &snap, &roots, |_| {}).unwrap();
+        assert!(dst.join("Docs").join("foto (1).jpg").exists(), "usa el nombre de `to` numerado");
+        assert_eq!(fs::read_to_string(dst.join("Docs").join("foto.jpg")).unwrap(), "otra");
+        assert!(!t.path().join("escapado.jpg").exists());
+        let rec = op.moves.iter().find(|m| m.name == "foto.jpg").unwrap();
+        assert!(rec.to.ends_with("foto (1).jpg"));
+    }
+
+    #[test]
     fn refuses_unscanned_changed_or_unauthorized_files() {
         let (_t, src, dst) = setup();
         let db = Db::memory();
@@ -290,6 +337,29 @@ mod tests {
         assert_eq!(factura.status, "not_restored");
         assert!(dst.join("Docs").join("Factura_Luz_2026.pdf").exists());
         assert!(src.join("foto.jpg").exists());
+    }
+
+    #[test]
+    fn undo_can_be_retried_after_a_file_was_blocked() {
+        let (_t, src, dst) = setup();
+        let db = Db::memory();
+        let roots = AllowedRoots::default();
+        roots.allow(&dst);
+        let (_, snap) = scan(&src, &opts(), &[], &[], &AtomicBool::new(false), |_| {}).unwrap();
+        let op = execute(&db, &plan_for(&src, &dst, &snap), &snap, &roots, |_| {}).unwrap();
+        // Algo ocupa el sitio original de la foto: no se puede devolver todavía.
+        fs::write(src.join("foto.jpg"), "intruso").unwrap();
+        let first = undo(&db, &op.id, |_| {}).unwrap();
+        assert_eq!(first.status, "partially_undone");
+        assert!(first.undone_at.is_none());
+        assert!(src.join("Factura_Luz_2026.pdf").exists(), "lo demás sí vuelve");
+        assert!(!db.snapshot(10).unwrap().managed.is_empty(), "sigue gestionada");
+        // Se libera el sitio y se reintenta.
+        fs::remove_file(src.join("foto.jpg")).unwrap();
+        let second = undo(&db, &op.id, |_| {}).unwrap();
+        assert_eq!(second.status, "rolled_back");
+        assert_eq!(fs::read_to_string(src.join("foto.jpg")).unwrap(), "foto");
+        assert!(second.errors.iter().all(|e| !e.contains("no se restauraron")));
     }
 
     #[test]

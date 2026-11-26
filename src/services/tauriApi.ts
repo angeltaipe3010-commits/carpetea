@@ -5,7 +5,7 @@
  */
 import { Channel, invoke } from '@tauri-apps/api/core'
 import type { DeskFlowApi } from '@/services/api'
-import type { DirProbe, DuplicateGroup, DuplicateProgress, Environment, ExecProgress, IndexedFolderRaw, Operation, PickedFolder, ScanProgress, ScanResult, SourceFolder } from '@/types'
+import type { DirProbe, DuplicateProgress, DuplicateSearch, Environment, ExecProgress, IndexedFolderRaw, Operation, PickedFolder, ScanProgress, ScanResult, SourceFolder } from '@/types'
 
 function channel<T>(cb: (p: T) => void) {
   const ch = new Channel<T>()
@@ -62,11 +62,11 @@ export const tauriApi: DeskFlowApi = {
 
   loadHistory: () => call<{ operations: Operation[]; managed: string[] }>('history'),
 
-  async findDuplicates(root, skip, onProgress, signal) {
-    const onAbort = () => void call('cancel')
+  async findDuplicates(root, skip, exclusions, onProgress, signal) {
+    const onAbort = () => void call('cancel_duplicates')
     signal.addEventListener('abort', onAbort)
     try {
-      return await call<DuplicateGroup[]>('find_duplicates', { root, skip, onProgress: channel<DuplicateProgress>(onProgress) })
+      return await call<DuplicateSearch>('find_duplicates', { root, skip, exclusions, onProgress: channel<DuplicateProgress>(onProgress) })
     } finally {
       signal.removeEventListener('abort', onAbort)
     }

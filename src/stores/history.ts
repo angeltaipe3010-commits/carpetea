@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { isTauri } from '@tauri-apps/api/core'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { SAMPLE_HISTORY, SAMPLE_MANAGED } from '@/data/mock'
 import type { Operation } from '@/types'
 
@@ -18,11 +19,25 @@ interface HistoryState {
   removeManaged: (paths: string[]) => void
 }
 
+// En escritorio el historial vive en SQLite (App lo carga al arrancar): no se
+// duplica en localStorage, que tiene poco espacio y podría llenarse.
+const native = isTauri()
+const noStorage: StateStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+// Copias de versiones anteriores que guardaban el historial aquí.
+if (native) {
+  try {
+    localStorage.removeItem('deskflow:history')
+  } catch {
+    /* sin acceso a localStorage: no pasa nada */
+  }
+}
+
 export const useHistory = create<HistoryState>()(
   persist(
     (set) => ({
-      operations: SAMPLE_HISTORY,
-      managed: SAMPLE_MANAGED,
+      // Los ejemplos solo existen en el prototipo del navegador.
+      operations: native ? [] : SAMPLE_HISTORY,
+      managed: native ? [] : SAMPLE_MANAGED,
       add: (op) => set((s) => ({ operations: [op, ...s.operations] })),
       replace: (op) => set((s) => ({ operations: s.operations.map((o) => (o.id === op.id ? op : o)) })),
       clearSamples: () => set((s) => ({ operations: s.operations.filter((o) => !o.sample) })),
@@ -34,9 +49,10 @@ export const useHistory = create<HistoryState>()(
     }),
     {
       name: 'deskflow:history',
+      storage: createJSONStorage(() => (native ? noStorage : localStorage)),
       // v2: rutas absolutas y carpetas gestionadas. Los datos de la v1 eran de ejemplo.
       version: 2,
-      migrate: () => ({ operations: SAMPLE_HISTORY, managed: SAMPLE_MANAGED }),
+      migrate: () => (native ? { operations: [], managed: [] } : { operations: SAMPLE_HISTORY, managed: SAMPLE_MANAGED }),
     },
   ),
 )

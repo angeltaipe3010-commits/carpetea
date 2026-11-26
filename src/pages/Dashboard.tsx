@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [folders, setFolders] = useState<SourceFolder[] | null>(null)
 
   useEffect(() => {
-    api.listSuggestedFolders().then(setFolders)
+    api.listSuggestedFolders().then(setFolders).catch(() => setFolders([]))
   }, [])
 
   const stats = useMemo(() => {

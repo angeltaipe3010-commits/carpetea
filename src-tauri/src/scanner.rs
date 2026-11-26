@@ -45,7 +45,7 @@ fn is_hidden(_m: &std::fs::Metadata) -> bool {
     false
 }
 
-fn excluded(p: &Path, exclusions: &[String]) -> bool {
+pub(crate) fn excluded(p: &Path, exclusions: &[String]) -> bool {
     let n = norm(p);
     let name = p.file_name().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
     exclusions.iter().any(|e| {
@@ -203,6 +203,18 @@ pub fn scan(
 
 const PROJECT_MARKERS: &[&str] = &["package.json", ".git", "cargo.toml", "pom.xml", "build.gradle", "pyproject.toml", "go.mod", "composer.json", ".sln", ".csproj"];
 pub(crate) const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target", "dist", "build", "bin", "obj", ".venv", "venv", "__pycache__", ".idea", ".vscode", ".next", ".claude"];
+
+/// Carpeta de un proyecto de código (package.json, .git, Cargo.toml…): no se toca por dentro.
+pub(crate) fn is_project_dir(dir: &Path) -> bool {
+    std::fs::read_dir(dir)
+        .map(|rd| {
+            rd.flatten().any(|e| {
+                let lower = e.file_name().to_string_lossy().to_lowercase();
+                PROJECT_MARKERS.iter().any(|m| lower == *m || (m.starts_with('.') && lower.ends_with(m)))
+            })
+        })
+        .unwrap_or(false)
+}
 
 /// Lee la estructura de carpetas existente bajo `root` (solo nombres, sin abrir archivos).
 /// Las carpetas de proyectos de código se marcan y no se recorren por dentro.

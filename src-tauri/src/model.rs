@@ -278,3 +278,20 @@ pub struct DuplicateProgress {
     pub processed: usize,
     pub total: usize,
 }
+
+/// Resultado de una búsqueda de duplicados, con lo que no se pudo comparar.
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateSearch {
+    pub groups: Vec<DuplicateGroup>,
+    /// Archivos revisados (con tamaño mayor que cero).
+    pub scanned: usize,
+    /// Solo en la nube: no se abren para no descargarlos.
+    pub skipped_cloud: usize,
+    /// No se pudieron leer (en uso, sin permiso de lectura…).
+    pub skipped_unreadable: usize,
+    /// Carpetas o archivos a los que Windows no dejó acceder.
+    pub skipped_denied: usize,
+    /// La carpeta elegida se sincroniza con este servicio.
+    pub cloud: Option<String>,
+}

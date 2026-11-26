@@ -18,9 +18,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use walkdir::WalkDir;
 
 use crate::fsops::fingerprint;
-use crate::model::{DuplicateFile, DuplicateGroup, DuplicateProgress, OrganizePlan, PlannedMove};
-use crate::safety::{is_system_path, norm};
-use crate::scanner::{is_hidden_entry, Snapshot, SnapshotMap, SKIP_DIRS};
+use crate::model::{DuplicateFile, DuplicateGroup, DuplicateProgress, DuplicateSearch, OrganizePlan, PlannedMove};
+use crate::safety::{is_cloud_only, is_system_path, norm};
+use crate::scanner::{excluded, is_hidden_entry, is_project_dir, Snapshot, SnapshotMap, SKIP_DIRS};
 
 const PARTIAL: usize = 64 * 1024;
 
@@ -51,40 +51,61 @@ fn hash_file(p: &Path, limit: Option<usize>, cancel: &AtomicBool) -> io::Result<
 }
 
 /// Agrupa candidatos por una clave y descarta los grupos de un solo archivo.
-fn regroup<K: std::hash::Hash + Eq>(groups: Vec<Vec<Candidate>>, mut key: impl FnMut(&Candidate) -> Option<K>) -> Vec<Vec<Candidate>> {
+/// Los archivos que no se pueden leer (clave `None`) se cuentan en `unreadable`.
+fn regroup<K: std::hash::Hash + Eq>(
+    groups: Vec<Vec<Candidate>>,
+    unreadable: &mut usize,
+    mut key: impl FnMut(&Candidate) -> Option<K>,
+) -> Vec<(K, Vec<Candidate>)> {
     let mut out = Vec::new();
     for g in groups {
         let mut by: HashMap<K, Vec<Candidate>> = HashMap::new();
         for c in g {
-            if let Some(k) = key(&c) {
-                by.entry(k).or_default().push(c);
+            match key(&c) {
+                Some(k) => by.entry(k).or_default().push(c),
+                None => *unreadable += 1,
             }
         }
-        out.extend(by.into_values().filter(|v| v.len() > 1));
+        out.extend(by.into_iter().filter(|(_, v)| v.len() > 1));
     }
     out
+}
+
+/// Qué archivos se pueden apartar después de la búsqueda, y de qué grupo es cada uno.
+#[derive(Default, Clone)]
+pub struct Found {
+    pub snapshot: SnapshotMap,
+    pub group_of: HashMap<String, String>,
 }
 
 pub fn find(
     root: &Path,
     skip: &[PathBuf],
+    exclusions: &[String],
     cancel: &AtomicBool,
     mut progress: impl FnMut(DuplicateProgress),
-) -> Result<(Vec<DuplicateGroup>, SnapshotMap), String> {
+) -> Result<(DuplicateSearch, Found), String> {
     let cancelled = || -> Result<(), String> {
         if cancel.load(Ordering::Relaxed) {
-            Err("cancelado".into())
+            Err("Búsqueda cancelada.".into())
         } else {
             Ok(())
         }
     };
+    let mut search = DuplicateSearch::default();
 
-    // 1. Tamaños.
+    // 1. Tamaños (solo metadatos; los archivos que solo están en la nube no se abren nunca).
     let mut by_size: HashMap<u64, Vec<Candidate>> = HashMap::new();
     let mut seen = 0usize;
     let mut it = WalkDir::new(root).min_depth(1).into_iter();
     while let Some(entry) = it.next() {
-        let Ok(entry) = entry else { continue };
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => {
+                search.skipped_denied += 1;
+                continue;
+            }
+        };
         let p = entry.path();
         let name = entry.file_name().to_string_lossy();
         if entry.file_type().is_dir() {
@@ -92,16 +113,30 @@ pub fn find(
                 || SKIP_DIRS.contains(&name.as_ref())
                 || is_system_path(p)
                 || is_hidden_entry(&entry)
+                || excluded(p, exclusions)
                 || skip.iter().any(|s| norm(s) == norm(p))
+                || is_project_dir(p)
             {
+                // Proyectos y programas portables: sus archivos idénticos son necesarios.
                 it.skip_current_dir();
             }
             continue;
         }
-        if !entry.file_type().is_file() || is_hidden_entry(&entry) {
+        if !entry.file_type().is_file() || is_hidden_entry(&entry) || excluded(p, exclusions) {
             continue;
         }
-        let Some((size, mtime)) = fingerprint(p) else { continue };
+        let Ok(meta) = entry.metadata() else {
+            search.skipped_unreadable += 1;
+            continue;
+        };
+        if is_cloud_only(&meta) {
+            search.skipped_cloud += 1;
+            continue;
+        }
+        let Some((size, mtime)) = fingerprint(p) else {
+            search.skipped_unreadable += 1;
+            continue;
+        };
         if size == 0 {
             continue; // los vacíos son "iguales" pero no ocupan espacio
         }
@@ -109,16 +144,18 @@ pub fn find(
         seen += 1;
         if seen % 200 == 0 {
             cancelled()?;
-            progress(DuplicateProgress { phase: "sizes", processed: seen, total: seen });
+            progress(DuplicateProgress { phase: "sizes", processed: seen, total: 0 });
         }
     }
-    progress(DuplicateProgress { phase: "sizes", processed: seen, total: seen });
+    search.scanned = seen;
     let groups: Vec<Vec<Candidate>> = by_size.into_values().filter(|v| v.len() > 1).collect();
+    let total: usize = groups.iter().map(Vec::len).sum();
+    progress(DuplicateProgress { phase: "sizes", processed: seen, total: seen });
 
     // 2. Inicio del archivo.
-    let total: usize = groups.iter().map(Vec::len).sum();
     let mut done = 0usize;
-    let groups = regroup(groups, |c| {
+    let mut unreadable = 0usize;
+    let partial = regroup(groups, &mut unreadable, |c| {
         done += 1;
         if done % 50 == 0 {
             progress(DuplicateProgress { phase: "partial-hash", processed: done, total });
@@ -127,27 +164,35 @@ pub fn find(
     });
     cancelled()?;
 
-    // 3. Contenido completo (si el archivo cabe en el primer bloque, ya está comparado).
-    let total: usize = groups.iter().map(Vec::len).sum();
+    // 3. Contenido completo. Si el archivo cabe en el primer bloque, ya está comparado entero.
+    let total: usize = partial.iter().map(|(_, g)| g.len()).sum();
     let mut done = 0usize;
-    let groups = regroup(groups, |c| {
-        done += 1;
-        progress(DuplicateProgress { phase: "full-hash", processed: done, total });
-        if c.size as usize <= PARTIAL {
-            hash_file(&c.path, Some(PARTIAL), cancel).ok()
-        } else {
-            hash_file(&c.path, None, cancel).ok()
+    let mut full: Vec<(blake3::Hash, Vec<Candidate>)> = Vec::new();
+    for (key, group) in partial {
+        if group[0].size as usize <= PARTIAL {
+            done += group.len();
+            progress(DuplicateProgress { phase: "full-hash", processed: done, total });
+            full.push((key, group));
+            continue;
         }
-    });
+        full.extend(regroup(vec![group], &mut unreadable, |c| {
+            done += 1;
+            progress(DuplicateProgress { phase: "full-hash", processed: done, total });
+            hash_file(&c.path, None, cancel).ok()
+        }));
+        cancelled()?;
+    }
     cancelled()?;
+    // Un fallo de lectura por cancelación no es un archivo ilegible.
+    search.skipped_unreadable += unreadable;
 
-    let mut snapshot = SnapshotMap::new();
-    let mut out: Vec<DuplicateGroup> = groups
+    let mut found = Found::default();
+    search.groups = full
         .into_iter()
         .enumerate()
-        .map(|(i, g)| {
+        .map(|(i, (hash, g))| {
             let size = g[0].size;
-            let hash = hash_file(&g[0].path, None, cancel).map(|h| h.to_hex().to_string()).unwrap_or_default();
+            let gid = format!("g{i}");
             let mut files: Vec<DuplicateFile> = g
                 .into_iter()
                 .map(|c| {
@@ -162,22 +207,38 @@ pub fn find(
                         size: c.size,
                         modified,
                     };
-                    snapshot.insert(id, Snapshot { path: c.path, size: c.size, mtime: c.mtime });
+                    found.group_of.insert(id.clone(), gid.clone());
+                    found.snapshot.insert(id, Snapshot { path: c.path, size: c.size, mtime: c.mtime });
                     f
                 })
                 .collect();
             files.sort_by(|a, b| a.modified.cmp(&b.modified));
-            DuplicateGroup { id: format!("g{i}"), hash, size, files }
+            DuplicateGroup { id: gid, hash: hash.to_hex().to_string(), size, files }
         })
         .collect();
     // Primero los que más espacio liberan.
-    out.sort_by_key(|g| std::cmp::Reverse(g.size * (g.files.len() as u64 - 1)));
+    search.groups.sort_by_key(|g| std::cmp::Reverse(g.size * (g.files.len() as u64 - 1)));
     progress(DuplicateProgress { phase: "done", processed: total, total });
-    Ok((out, snapshot))
+    Ok((search, found))
 }
 
 /// Plan para apartar copias en `dest` (sin pisar nada: nombres repetidos se numeran).
-pub fn quarantine_plan(file_ids: &[String], snapshot: &SnapshotMap, root: &Path, dest: &Path) -> Result<OrganizePlan, String> {
+pub fn quarantine_plan(file_ids: &[String], found: &Found, root: &Path, dest: &Path) -> Result<OrganizePlan, String> {
+    let snapshot = &found.snapshot;
+    // Nunca se apartan todas las copias de un grupo: siempre queda una en su sitio.
+    let mut size_of: HashMap<&str, usize> = HashMap::new();
+    for g in found.group_of.values() {
+        *size_of.entry(g.as_str()).or_default() += 1;
+    }
+    let mut picked: HashMap<&str, usize> = HashMap::new();
+    for id in file_ids {
+        if let Some(g) = found.group_of.get(id) {
+            *picked.entry(g.as_str()).or_default() += 1;
+        }
+    }
+    if picked.iter().any(|(g, n)| *n >= size_of.get(g).copied().unwrap_or(0)) {
+        return Err("Hay que conservar al menos una copia de cada grupo.".into());
+    }
     let mut used: HashSet<String> = HashSet::new();
     let mut moves = Vec::new();
     for id in file_ids {
@@ -227,15 +288,18 @@ mod tests {
         std::fs::write(r.join("vacio.txt"), b"").unwrap();
         std::fs::write(r.join("vacio2.txt"), b"").unwrap();
         let cancel = AtomicBool::new(false);
-        let (groups, snap) = find(r, &[], &cancel, |_| {}).unwrap();
+        std::fs::write(r.join("a").join("foto (2).jpg"), b"mismo contenido").unwrap();
+        let (search, found) = find(r, &[], &[], &cancel, |_| {}).unwrap();
+        let groups = &search.groups;
         assert_eq!(groups.len(), 1);
         let names: Vec<_> = groups[0].files.iter().map(|f| f.name.as_str()).collect();
         assert!(names.contains(&"foto.jpg") && names.contains(&"copia de foto.jpg"));
-        assert_eq!(snap.len(), 2);
+        assert_eq!(found.snapshot.len(), 3);
 
         let dest = r.join("Por revisar").join("Duplicados");
         let ids: Vec<String> = groups[0].files.iter().map(|f| f.id.clone()).collect();
-        let plan = quarantine_plan(&ids, &snap, r, &dest).unwrap();
+        assert!(quarantine_plan(&ids, &found, r, &dest).is_err(), "nunca todas las copias");
+        let plan = quarantine_plan(&ids[1..], &found, r, &dest).unwrap();
         let finals: HashSet<_> = plan.moves.iter().map(|m| m.final_name.to_lowercase()).collect();
         assert_eq!(finals.len(), 2, "nombres únicos en la cuarentena");
     }
@@ -249,7 +313,28 @@ mod tests {
         std::fs::write(r.join("a.txt"), b"igual").unwrap();
         std::fs::write(q.join("a.txt"), b"igual").unwrap();
         let cancel = AtomicBool::new(false);
-        let (groups, _) = find(r, &[q], &cancel, |_| {}).unwrap();
-        assert!(groups.is_empty());
+        let (search, _) = find(r, &[q], &[], &cancel, |_| {}).unwrap();
+        assert!(search.groups.is_empty());
+    }
+
+    #[test]
+    fn skips_projects_and_exclusions_and_honours_cancel() {
+        let t = crate::test_dir();
+        let r = t.path();
+        let app = r.join("MiApp");
+        std::fs::create_dir_all(&app).unwrap();
+        std::fs::write(app.join("package.json"), b"{}").unwrap();
+        std::fs::write(app.join("index.js"), b"codigo").unwrap();
+        std::fs::write(r.join("index.js"), b"codigo").unwrap();
+        std::fs::create_dir_all(r.join("Privado")).unwrap();
+        std::fs::write(r.join("Privado").join("b.txt"), b"igual").unwrap();
+        std::fs::write(r.join("b.txt"), b"igual").unwrap();
+        let cancel = AtomicBool::new(false);
+        let (search, _) = find(r, &[], &["Privado".into()], &cancel, |_| {}).unwrap();
+        assert!(search.groups.is_empty(), "ni proyectos ni carpetas excluidas");
+
+        cancel.store(true, Ordering::Relaxed);
+        std::fs::write(r.join("c.txt"), b"igual").unwrap();
+        assert!(find(r, &[], &[], &cancel, |_| {}).is_err(), "cancelar devuelve error, no resultados");
     }
 }

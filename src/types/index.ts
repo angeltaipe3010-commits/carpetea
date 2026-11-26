@@ -128,6 +128,8 @@ export type OperationStatus =
   | 'partial'
   | 'failed'
   | 'rolled_back'
+  /** Deshacer dejó archivos sin devolver; se puede reintentar. */
+  | 'partially_undone'
 
 export interface MoveRecord {
   fileId: string
@@ -191,6 +193,20 @@ export interface DuplicateGroup {
   hash: string
   size: number
   files: DuplicateFile[]
+}
+
+/** Resultado de una búsqueda, con lo que no se pudo comparar. */
+export interface DuplicateSearch {
+  groups: DuplicateGroup[]
+  scanned: number
+  /** Solo en la nube: no se abren para no descargarlos. */
+  skippedCloud: number
+  /** En uso o sin permiso de lectura. */
+  skippedUnreadable: number
+  /** Carpetas o archivos a los que Windows no dejó acceder. */
+  skippedDenied: number
+  /** La carpeta se sincroniza con este servicio. */
+  cloud?: string | null
 }
 
 export type DuplicatePhase = 'sizes' | 'partial-hash' | 'full-hash' | 'done'
