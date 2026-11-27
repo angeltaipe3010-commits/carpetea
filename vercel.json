@@ -32,5 +32,18 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "deskflow-q8pc.vercel.app"
+        }
+      ],
+      "destination": "https://carpetea.vercel.app/:path",
+      "permanent": true
+    }
   ]
 }
