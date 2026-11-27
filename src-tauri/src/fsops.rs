@@ -139,7 +139,7 @@ fn temp_name(dst: &Path) -> PathBuf {
     let name = dst.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     let mut i = 0u32;
     loop {
-        let candidate = dst.with_file_name(format!(".{name}.deskflow-{i}.part"));
+        let candidate = dst.with_file_name(format!(".{name}.carpetea-{i}.part"));
         if !candidate.exists() {
             return candidate;
         }

@@ -203,7 +203,7 @@ impl AllowedRoots {
         if self.list.lock().unwrap().iter().any(|r| is_within(p, r)) {
             Ok(())
         } else {
-            Err(format!("DeskFlow no tiene permiso para usar {}. Elígela primero.", p.display()))
+            Err(format!("Carpetea no tiene permiso para usar {}. Elígela primero.", p.display()))
         }
     }
 }

@@ -155,7 +155,7 @@ export function FolderPicker({
       </div>
       <p className="mt-3 flex items-center gap-2 text-[12px] text-muted">
         <ShieldCheck className="size-3.5 shrink-0 text-success" />
-        DeskFlow no sube nada por su cuenta. Si eliges una carpeta de OneDrive, Google Drive, Dropbox o iCloud, te preguntaremos antes.
+        Carpetea no sube nada por su cuenta. Si eliges una carpeta de OneDrive, Google Drive, Dropbox o iCloud, te preguntaremos antes.
       </p>
     </Dialog>
   )

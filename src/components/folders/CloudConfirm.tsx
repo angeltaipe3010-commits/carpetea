@@ -13,7 +13,7 @@ export interface CloudTarget {
 
 /**
  * Aviso antes de guardar en una carpeta sincronizada con la nube.
- * Aceptar lo permite; rechazar hace que DeskFlow use una carpeta Documentos
+ * Aceptar lo permite; rechazar hace que Carpetea use una carpeta Documentos
  * local (y la cree si no existe). El usuario puede cambiarla después.
  */
 export function CloudConfirm({
@@ -49,13 +49,13 @@ export function CloudConfirm({
     >
       <div className="space-y-3 text-[13px] leading-relaxed text-muted">
         <p>
-          <span className="font-medium text-text">{target?.what}</span> {target?.plural ? 'se sincronizan' : 'se sincroniza'} con {provider}. Todo lo que DeskFlow organice ahí se subirá
+          <span className="font-medium text-text">{target?.what}</span> {target?.plural ? 'se sincronizan' : 'se sincroniza'} con {provider}. Todo lo que Carpetea organice ahí se subirá
           a tu cuenta en la nube.
         </p>
         <p className="flex items-start gap-2 rounded-lg bg-surface-2 px-3 py-2.5">
           <HardDrive className="mt-0.5 size-3.5 shrink-0 text-success" />
           <span>
-            Si eliges <span className="font-medium text-text">No</span>, DeskFlow buscará una carpeta Documentos que esté solo en este equipo y, si no
+            Si eliges <span className="font-medium text-text">No</span>, Carpetea buscará una carpeta Documentos que esté solo en este equipo y, si no
             existe, la creará. Podrás cambiarla después.
           </span>
         </p>

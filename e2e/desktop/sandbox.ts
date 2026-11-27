@@ -70,7 +70,7 @@ export function createSandbox(): Sandbox {
     exists: (...p) => existsSync(join(root, ...p)),
     list: (...p) => readdirSync(join(root, ...p)),
     cleanup: () => {
-      if (!process.env.DESKFLOW_E2E_KEEP) rmSync(root, { recursive: true, force: true, maxRetries: 5 })
+      if (!process.env.CARPETEA_E2E_KEEP) rmSync(root, { recursive: true, force: true, maxRetries: 5 })
     },
   }
   write(s.origen, ORIGEN)

@@ -33,7 +33,7 @@ async function asDesktop(page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll('div, span')) {
       if (el.childElementCount) continue
-      if (el.textContent === 'Disponible en la app de escritorio.') el.textContent = 'Abre el selector de Windows. DeskFlow solo tendrá acceso a esa carpeta.'
+      if (el.textContent === 'Disponible en la app de escritorio.') el.textContent = 'Abre el selector de Windows. Carpetea solo tendrá acceso a esa carpeta.'
       if (el.textContent === 'Ejemplo') el.style.display = 'none'
     }
     for (const b of document.querySelectorAll('button[disabled]')) if (b.textContent.includes('Examinar')) b.disabled = false

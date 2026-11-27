@@ -1,6 +1,6 @@
 /**
  * Registro de errores de la interfaz. En la app de escritorio se escriben en
- * el archivo de registro de DeskFlow (junto a los del motor), para poder
+ * el archivo de registro de Carpetea (junto a los del motor), para poder
  * diagnosticar un problema sin pedir capturas. Nunca sale del equipo.
  */
 import { invoke, isTauri } from '@tauri-apps/api/core'

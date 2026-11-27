@@ -107,7 +107,7 @@ export default function Settings() {
           </Row>
         </Section>
 
-        <Section title="Exclusiones" description="DeskFlow nunca entra en estas rutas ni las modifica. Las carpetas del sistema están protegidas por defecto.">
+        <Section title="Exclusiones" description="Carpetea nunca entra en estas rutas ni las modifica. Las carpetas del sistema están protegidas por defecto.">
           <ul className="flex flex-wrap gap-1.5 px-5 pt-1">
             {s.exclusions.map((e) => (
               <li key={e} className="flex h-7 items-center gap-1 rounded-md border border-border bg-surface-2 pr-1 pl-2.5 font-mono text-[11.5px] text-muted">
@@ -146,7 +146,7 @@ export default function Settings() {
                 Análisis de contenido local <Badge>Próximamente</Badge>
               </span>
             }
-            hint="Leerá el texto de PDF y documentos para clasificarlos mejor, sin que salga de tu equipo. Hoy DeskFlow usa solo el nombre, el tipo, la fecha, tus reglas y tus carpetas."
+            hint="Leerá el texto de PDF y documentos para clasificarlos mejor, sin que salga de tu equipo. Hoy Carpetea usa solo el nombre, el tipo, la fecha, tus reglas y tus carpetas."
           >
             <Switch checked={false} onChange={() => {}} label="Análisis de contenido local" disabled />
           </Row>
@@ -162,17 +162,17 @@ export default function Settings() {
           </Row>
           <div className="mx-5 mb-4 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[12.5px] text-muted">
             <Lock className="mt-0.5 size-3.5 shrink-0 text-success" />
-            DeskFlow funciona sin conexión y no envía archivos, nombres ni estadísticas a ningún servidor. Si eliges un destino sincronizado con OneDrive, Google Drive, Dropbox o iCloud, te pedirá confirmación; si no la das, usará una carpeta Documentos local.
+            Carpetea funciona sin conexión y no envía archivos, nombres ni estadísticas a ningún servidor. Si eliges un destino sincronizado con OneDrive, Google Drive, Dropbox o iCloud, te pedirá confirmación; si no la das, usará una carpeta Documentos local.
           </div>
         </Section>
 
-        <Section title="Acerca de DeskFlow">
+        <Section title="Acerca de Carpetea">
           <Row label="Versión" hint="Organizador de archivos local. Licencia MIT: se ofrece tal cual, sin garantía.">
             <span className="text-[13px] text-muted tabular-nums">{version ?? '—'}</span>
           </Row>
           {isNative && (
             <>
-              <Row label="Licencia y avisos de terceros" hint="Las licencias del software de código abierto que incluye DeskFlow.">
+              <Row label="Licencia y avisos de terceros" hint="Las licencias del software de código abierto que incluye Carpetea.">
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" icon={FileText} onClick={() => openDoc('LICENSE.txt')}>
                     Licencia

@@ -142,7 +142,7 @@ test('deshacer devuelve todo y retira las carpetas que creó', async ({ app }) =
 
 test('no deja organizar hacia una carpeta sin permiso', async ({ app }) => {
   const { page, setDestination } = app
-  await setDestination({ mode: 'custom', customPath: 'C:\\DeskFlow-sin-permiso' })
+  await setDestination({ mode: 'custom', customPath: 'C:\\Carpetea-sin-permiso' })
   await analyzeE2E(page)
   await expect(page.getByRole('alert').filter({ hasText: 'no tiene permiso' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Revisar y confirmar' })).toBeDisabled()

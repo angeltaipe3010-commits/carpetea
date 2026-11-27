@@ -36,6 +36,6 @@ export const useRules = create<RulesState>()(
           return { rules }
         }),
     }),
-    { name: 'deskflow:rules', storage: prefsStorage },
+    { name: 'carpetea:rules', storage: prefsStorage },
   ),
 )

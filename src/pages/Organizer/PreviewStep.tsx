@@ -70,7 +70,7 @@ export default function PreviewStep() {
 
   const regrant = async (path: string) => {
     try {
-      const picked = await api.pickFolder(`Vuelve a elegir ${baseName(path)} para dar permiso a DeskFlow`, path)
+      const picked = await api.pickFolder(`Vuelve a elegir ${baseName(path)} para dar permiso a Carpetea`, path)
       if (!picked) return
       if (picked.problem) return toast({ tone: 'danger', title: 'No se puede usar esa carpeta', description: picked.problem })
       if (picked.path.toLowerCase() !== path.toLowerCase()) {
@@ -242,7 +242,7 @@ export default function PreviewStep() {
         <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3">
           <CircleExclamationPoint className="size-4 shrink-0 text-warning" />
           <div className="min-w-0 flex-1 text-[13px] text-text">
-            <span className="font-medium">DeskFlow no tiene permiso para usar {missing.map((m) => baseName(m)).join(', ')}.</span>{' '}
+            <span className="font-medium">Carpetea no tiene permiso para usar {missing.map((m) => baseName(m)).join(', ')}.</span>{' '}
             <span className="text-muted">Por seguridad solo usa carpetas que eliges en el selector de Windows. Vuelve a elegirla para continuar.</span>
           </div>
           {missing.map((m) => (
@@ -268,7 +268,7 @@ export default function PreviewStep() {
       {o.skippedManaged > 0 && (
         <p className="mb-4 flex items-center gap-2 px-1 text-[12.5px] text-muted">
           <Info className="size-3.5 shrink-0 text-primary" />
-          Se omitieron {plural(o.skippedManaged, 'archivo que ya está', 'archivos que ya están')} en carpetas organizadas por DeskFlow.
+          Se omitieron {plural(o.skippedManaged, 'archivo que ya está', 'archivos que ya están')} en carpetas organizadas por Carpetea.
         </p>
       )}
 

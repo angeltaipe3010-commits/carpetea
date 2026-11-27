@@ -1,5 +1,5 @@
 /**
- * Tipos de dominio de DeskFlow.
+ * Tipos de dominio de Carpetea.
  *
  * Son el contrato entre la interfaz y el motor. En la Fase 2 estos mismos
  * tipos se reflejarán en structs de Rust (serde) y viajarán por los comandos
@@ -83,7 +83,7 @@ export interface ScanResult {
   classifications: Classification[]
   /** Rutas absolutas de archivos que ya existen en disco: generan conflictos. */
   existing: string[]
-  /** Archivos omitidos por estar en carpetas que DeskFlow ya organizó antes. */
+  /** Archivos omitidos por estar en carpetas que Carpetea ya organizó antes. */
   skippedManaged: number
   durationMs: number
 }

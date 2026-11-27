@@ -1,4 +1,4 @@
-//! DeskFlow: motor nativo.
+//! Carpetea: motor nativo.
 //!
 //! La interfaz (React) nunca toca el sistema de archivos: todo pasa por estos
 //! comandos, que validan rutas contra las carpetas autorizadas.
@@ -90,7 +90,7 @@ fn environment(state: State<AppState>) -> Environment {
 /// La versión final ignora estas variables.
 fn e2e_root() -> Option<PathBuf> {
     if cfg!(debug_assertions) {
-        std::env::var_os("DESKFLOW_E2E_ROOT").map(PathBuf::from).filter(|p| p.is_dir())
+        std::env::var_os("CARPETEA_E2E_ROOT").map(PathBuf::from).filter(|p| p.is_dir())
     } else {
         None
     }
@@ -205,7 +205,7 @@ async fn scan(
 async fn index_structure(state: State<'_, AppState>, root: String, max_depth: usize, skip: Vec<String>) -> Res<Vec<IndexedFolder>> {
     let root = PathBuf::from(root);
     if let Err(e) = state.roots.check(&root) {
-        eprintln!("[deskflow] index_structure rechazado: {e}");
+        eprintln!("[carpetea] index_structure rechazado: {e}");
         return Err(e);
     }
     if !root.is_dir() {
@@ -368,7 +368,7 @@ async fn quarantine_duplicates(
 }
 
 /// Claves de preferencias que la interfaz puede guardar (nada más).
-const PREF_KEYS: &[&str] = &["deskflow:settings", "deskflow:rules"];
+const PREF_KEYS: &[&str] = &["carpetea:settings", "carpetea:rules"];
 
 #[tauri::command]
 fn pref_get(state: State<AppState>, key: String) -> Res<Option<String>> {
@@ -405,18 +405,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // En depuración, las pruebas E2E usan su propia base de datos.
-            let dir = match std::env::var_os("DESKFLOW_DATA_DIR").filter(|_| cfg!(debug_assertions)) {
+            let dir = match std::env::var_os("CARPETEA_DATA_DIR").filter(|_| cfg!(debug_assertions)) {
                 Some(d) => PathBuf::from(d),
                 None => app.path().app_data_dir()?,
             };
             std::fs::create_dir_all(&dir)?;
-            let log_dir = if cfg!(debug_assertions) && std::env::var_os("DESKFLOW_DATA_DIR").is_some() {
+            let log_dir = if cfg!(debug_assertions) && std::env::var_os("CARPETEA_DATA_DIR").is_some() {
                 dir.join("logs")
             } else {
                 app.path().app_log_dir()?
             };
             logging::init(&log_dir);
-            let db = db::Db::open(&dir.join("deskflow.db")).inspect_err(|e| logging::error("abrir la base de datos", &e.to_string()))?;
+            let db_path = dir.join("carpetea.db");
+            // Primera vez tras el cambio de nombre: copia los datos de DeskFlow 1.0.0.
+            if std::env::var_os("CARPETEA_DATA_DIR").is_none() {
+                match db::import_legacy(&db_path) {
+                    Ok(true) => logging::write("INFO", "datos de DeskFlow 1.0.0 importados"),
+                    Ok(false) => {}
+                    Err(e) => logging::error("importar los datos de DeskFlow", &e.to_string()),
+                }
+            }
+            let db = db::Db::open(&db_path).inspect_err(|e| logging::error("abrir la base de datos", &e.to_string()))?;
             // Modo de pruebas: el motor queda encerrado en la carpeta de pruebas.
             let roots = match e2e_root() {
                 Some(root) => AllowedRoots::jailed(&root),
@@ -454,5 +463,5 @@ pub fn run() {
             quarantine_duplicates
         ])
         .run(tauri::generate_context!())
-        .expect("error al iniciar DeskFlow");
+        .expect("error al iniciar Carpetea");
 }

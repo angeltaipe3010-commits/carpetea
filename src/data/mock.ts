@@ -43,7 +43,7 @@ const DOWNLOADS_SEED: Seed[] = [
   ['documento.pdf', 340, '2026-05-17'],
   ['scan0001.pdf', 3120, '2026-04-02'],
   ['scan0002.pdf', 2980, '2026-04-02'],
-  ['logo_deskflow_v3.svg', 18, '2026-11-18'],
+  ['logo_carpetea_v3.svg', 18, '2026-11-18'],
   ['mockup_dashboard_saas.fig', 9300, '2026-11-11'],
   ['banner_redes_sociales.psd', 48200, '2026-09-21'],
   ['icono_app_1024.png', 410, '2026-11-18'],
@@ -71,7 +71,7 @@ const DOWNLOADS_SEED: Seed[] = [
   ['temp_8823.tmp', 4, '2026-11-24'],
   ['documento.pdf', 290, '2026-02-08', 'Nueva carpeta'],
   ['Captura de pantalla 2026-11-18 223010.png', 640, '2026-11-18'],
-  // Ya organizados por DeskFlow en una operación anterior: se omiten al reanalizar.
+  // Ya organizados por Carpetea en una operación anterior: se omiten al reanalizar.
   ['Captura de pantalla 2026-11-18 223010.png', 640, '2026-11-18', 'Imágenes/Capturas'],
   ['Screenshot 2026-11-03 091512.png', 512, '2026-11-03', 'Imágenes/Capturas'],
 ]
@@ -125,7 +125,7 @@ function buildDownloads(): FileEntry[] {
 }
 
 const DESKTOP_SEED: Seed[] = [
-  ['Proyecto_DeskFlow_ideas.docx', 64, '2026-11-24'],
+  ['Proyecto_Carpetea_ideas.docx', 64, '2026-11-24'],
   ['Factura_Hosting_2026.pdf', 72, '2026-11-01'],
   ['Captura de pantalla 2026-11-23 101522.png', 520, '2026-11-23'],
   ['Screenshot 2026-11-22 190144.png', 610, '2026-11-22'],
@@ -182,7 +182,7 @@ export const EXISTING_FILES: string[] = [
   'C:\\Users\\Usuario\\Downloads\\Imágenes\\Capturas\\Screenshot 2026-11-03 091512.png',
 ]
 
-/** Carpetas que DeskFlow creó en operaciones anteriores (en la Fase 2, tabla en SQLite). */
+/** Carpetas que Carpetea creó en operaciones anteriores (en la Fase 2, tabla en SQLite). */
 export const SAMPLE_MANAGED: string[] = [
   'C:\\Users\\Usuario\\Downloads\\Imágenes',
   'C:\\Users\\Usuario\\Downloads\\Imágenes\\Capturas',

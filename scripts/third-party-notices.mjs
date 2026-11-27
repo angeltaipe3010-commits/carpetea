@@ -1,5 +1,5 @@
 // Genera THIRD_PARTY_NOTICES.txt con las licencias de todo lo que se distribuye
-// dentro de DeskFlow: dependencias de producción de npm (y Tailwind, cuyo CSS
+// dentro de Carpetea: dependencias de producción de npm (y Tailwind, cuyo CSS
 // generado va en la app) y crates de Rust que se compilan en el ejecutable.
 //
 //   node scripts/third-party-notices.mjs
@@ -85,13 +85,13 @@ while (stack.length) {
 }
 const crates = [...keep]
   .map((id) => byId.get(id))
-  .filter((p) => p && p.name !== 'deskflow')
+  .filter((p) => p && p.name !== 'carpetea')
   .sort((a, b) => a.name.localeCompare(b.name))
 for (const p of crates) add('crate', p.name, p.version, p.license ?? '', dirname(p.manifest_path))
 
-const header = `DeskFlow — avisos de terceros
+const header = `Carpetea — avisos de terceros
 
-DeskFlow incluye software de terceros (${count} paquetes). A continuación están
+Carpetea incluye software de terceros (${count} paquetes). A continuación están
 sus licencias; los paquetes con el mismo texto de licencia aparecen juntos, con
 cada aviso de copyright distinto.
 Generado con scripts/third-party-notices.mjs.

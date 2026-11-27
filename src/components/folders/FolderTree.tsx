@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { collapse } from '@/lib/motion'
 import type { FolderNode } from '@/types'
 
-export const DRAG_MIME = 'application/x-deskflow-files'
+export const DRAG_MIME = 'application/x-carpetea-files'
 
 interface TreeProps {
   root: FolderNode

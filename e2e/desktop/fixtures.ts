@@ -1,5 +1,5 @@
 /**
- * Fixture de la app de escritorio: arranca DeskFlow (compilación de depuración)
+ * Fixture de la app de escritorio: arranca Carpetea (compilación de depuración)
  * con datos aislados y se conecta a su WebView2 por CDP.
  */
 import { test as base, chromium, expect, type Browser, type Page } from '@playwright/test'
@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createSandbox, type Sandbox } from './sandbox'
 
-const EXE = resolve('src-tauri', 'target', 'debug', 'deskflow.exe')
+const EXE = resolve('src-tauri', 'target', 'debug', 'carpetea.exe')
 const CDP_PORT = 9333
 const DEV_URL = 'http://localhost:1420'
 
@@ -31,12 +31,12 @@ async function connect(): Promise<Browser> {
       await new Promise((r) => setTimeout(r, 300))
     }
   }
-  throw new Error(`DeskFlow no abrió el puerto de depuración: ${String(last)}`)
+  throw new Error(`Carpetea no abrió el puerto de depuración: ${String(last)}`)
 }
 
 async function appPage(browser: Browser): Promise<Page> {
   const context = browser.contexts()[0]
-  if (!context) throw new Error('DeskFlow no expuso ninguna ventana por CDP')
+  if (!context) throw new Error('Carpetea no expuso ninguna ventana por CDP')
   // La ventana puede existir ya (en about:blank) y navegar después: se sondea la URL.
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
@@ -44,7 +44,7 @@ async function appPage(browser: Browser): Promise<Page> {
     if (page) return page
     await new Promise((r) => setTimeout(r, 200))
   }
-  throw new Error(`La ventana de DeskFlow no cargó ${DEV_URL}`)
+  throw new Error(`La ventana de Carpetea no cargó ${DEV_URL}`)
 }
 
 export const test = base.extend<object, { app: DesktopApp }>({
@@ -60,10 +60,10 @@ export const test = base.extend<object, { app: DesktopApp }>({
           env: {
             ...process.env,
             WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${CDP_PORT}`,
-            // Perfil propio: no comparte almacenamiento con tu instancia de DeskFlow.
+            // Perfil propio: no comparte almacenamiento con tu instancia de Carpetea.
             WEBVIEW2_USER_DATA_FOLDER: sandbox.webview,
-            DESKFLOW_DATA_DIR: sandbox.data,
-            DESKFLOW_E2E_ROOT: sandbox.root,
+            CARPETEA_DATA_DIR: sandbox.data,
+            CARPETEA_E2E_ROOT: sandbox.root,
           },
         })
         browser = await connect()
@@ -72,10 +72,10 @@ export const test = base.extend<object, { app: DesktopApp }>({
 
         const setDestination: DesktopApp['setDestination'] = async (dest) => {
           await page.evaluate((d) => {
-            const raw = localStorage.getItem('deskflow:settings')
+            const raw = localStorage.getItem('carpetea:settings')
             const saved = raw ? JSON.parse(raw) : { state: {}, version: 0 }
             saved.state.destination = { customPath: '', ...d }
-            localStorage.setItem('deskflow:settings', JSON.stringify(saved))
+            localStorage.setItem('carpetea:settings', JSON.stringify(saved))
           }, dest)
           await page.reload()
           await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible()

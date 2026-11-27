@@ -38,7 +38,7 @@ export default function ResultStep() {
         <Progress value={frac} label="Progreso de la organización" className="mt-5" />
         <p className="mt-2.5 h-4 truncate font-mono text-[11px] text-faint">{exec?.current}</p>
         <p className="mt-5 rounded-lg bg-surface-2 px-3.5 py-2.5 text-[12.5px] text-muted">
-          Cada movimiento se verifica y se registra antes de pasar al siguiente. Mantén DeskFlow abierto hasta que termine.
+          Cada movimiento se verifica y se registra antes de pasar al siguiente. Mantén Carpetea abierto hasta que termine.
         </p>
       </Panel>
     )

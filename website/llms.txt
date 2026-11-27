@@ -1,18 +1,16 @@
-# DeskFlow
+# Carpetea
 
-> DeskFlow es un organizador de archivos gratuito y de código abierto (licencia MIT) para Windows 10 y 11. Ordena carpetas como Descargas y Escritorio usando las carpetas que el usuario ya tiene, muestra la propuesta antes de mover nada, nunca borra ni sobrescribe archivos y permite deshacer cada organización. Funciona sin conexión: no envía archivos, nombres ni estadísticas a ningún servidor.
-
-No confundir con Deskflow (github.com/deskflow/deskflow), un programa distinto para compartir teclado y ratón entre ordenadores.
+> Carpetea es un organizador de archivos gratuito y de código abierto (licencia MIT) para Windows 10 y 11. Ordena carpetas como Descargas y Escritorio usando las carpetas que el usuario ya tiene, muestra la propuesta antes de mover nada, nunca borra ni sobrescribe archivos y permite deshacer cada organización. Funciona sin conexión: no envía archivos, nombres ni estadísticas a ningún servidor.
 
 ## Páginas principales
 
-- [Página de DeskFlow](https://deskflow-q8pc.vercel.app/): qué hace, cómo funciona en tres pasos, garantías de seguridad y preguntas frecuentes.
-- [Descarga de la versión 1.0.0](https://github.com/angeltaipe3010-commits/deskflow/releases/latest): instalador para Windows de 64 bits (2,6 MB) con su huella SHA-256.
-- [Código fuente](https://github.com/angeltaipe3010-commits/deskflow): repositorio público con el motor en Rust (Tauri 2) y la interfaz en React.
+- [Página de Carpetea](https://carpetea.vercel.app/): qué hace, cómo funciona en tres pasos, garantías de seguridad y preguntas frecuentes.
+- [Descarga de la última versión](https://github.com/angeltaipe3010-commits/carpetea/releases/latest): instalador para Windows de 64 bits (2,6 MB) con su huella SHA-256.
+- [Código fuente](https://github.com/angeltaipe3010-commits/carpetea): repositorio público con el motor en Rust (Tauri 2) y la interfaz en React.
 
 ## Datos clave
 
-- Versión actual: 1.0.0. Sistema: Windows 10 y 11 de 64 bits. Precio: gratis. Licencia: MIT.
+- Versión actual: 1.0.1. Sistema: Windows 10 y 11 de 64 bits. Precio: gratis. Licencia: MIT.
 - Instalación: solo para el usuario actual, sin permisos de administrador ni cuenta.
 - Vista previa: el usuario revisa el árbol de carpetas propuesto, puede renombrar carpetas y mover o excluir archivos, y nada se mueve hasta que confirma.
 - Seguridad: nunca sobrescribe (si el nombre existe, guarda «(1)»), no mueve archivos abiertos o que cambiaron tras el análisis, y anota cada movimiento antes de hacerlo para recuperarse de un corte de luz.
@@ -23,4 +21,4 @@ No confundir con Deskflow (github.com/deskflow/deskflow), un programa distinto p
 
 ## Autor
 
-Angel Taipe (https://github.com/angeltaipe3010-commits). Problemas y sugerencias: https://github.com/angeltaipe3010-commits/deskflow/issues
+Angel Taipe (https://github.com/angeltaipe3010-commits). Problemas y sugerencias: https://github.com/angeltaipe3010-commits/carpetea/issues

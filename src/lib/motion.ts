@@ -1,7 +1,7 @@
 import type { Transition, Variants } from 'motion/react'
 
 /**
- * Vocabulario de movimiento de DeskFlow, tomado de las reglas de la skill
+ * Vocabulario de movimiento de Carpetea, tomado de las reglas de la skill
  * MotionSites y ajustado a una app de escritorio: duraciones más cortas
  * (150–300 ms), desplazamientos de 4–8 px y nada decorativo en bucle.
  */

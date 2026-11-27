@@ -324,6 +324,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "carpetea"
+version = "1.0.1"
+dependencies = [
+ "blake3",
+ "chrono",
+ "dirs 5.0.1",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tempfile",
+ "thiserror 2.0.21",
+ "walkdir",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -631,25 +650,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "deskflow"
-version = "1.0.0"
-dependencies = [
- "blake3",
- "chrono",
- "dirs 5.0.1",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tempfile",
- "thiserror 2.0.21",
- "walkdir",
- "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { reportError } from './log'
 
-export const PREF_KEYS = ['deskflow:settings', 'deskflow:rules'] as const
+export const PREF_KEYS = ['carpetea:settings', 'carpetea:rules'] as const
 
 const native = isTauri()
 

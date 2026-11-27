@@ -29,7 +29,7 @@ p { margin-top: 28px; font-size: 24px; line-height: 1.35; letter-spacing: -0.01e
 .shot img { display: block; width: 100%; }
 </style></head><body>
 <div class="copy">
-  <div class="brand">${icon}DeskFlow</div>
+  <div class="brand">${icon}Carpetea</div>
   <div class="kicker">Organizador de archivos para Windows</div>
   <h1>Tus archivos,<br>en su <span>sitio</span>.</h1>
   <p>Vista previa antes de mover, nunca borra nada y todo se deshace. Gratis y sin nube.</p>

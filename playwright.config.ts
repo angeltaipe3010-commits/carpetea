@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test'
  * Pruebas E2E de la app de escritorio (Tauri 2 + WebView2 en Windows).
  *
  * El fixture de `e2e/desktop/fixtures.ts` arranca una instancia propia de
- * DeskFlow (compilación de depuración) con una carpeta de pruebas aislada y se
+ * Carpetea (compilación de depuración) con una carpeta de pruebas aislada y se
  * conecta a su ventana por CDP. Hay una sola ventana y estado real en disco, así
  * que las pruebas van en serie con un único worker.
  */

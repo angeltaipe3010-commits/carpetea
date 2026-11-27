@@ -1,10 +1,10 @@
 /**
- * Implementación nativa de `DeskFlowApi`: llama a los comandos de Rust
+ * Implementación nativa de `CarpeteaApi`: llama a los comandos de Rust
  * (`src-tauri/src/lib.rs`) y recibe el progreso por canales.
  * Ninguna ruta se toca desde JavaScript.
  */
 import { Channel, invoke } from '@tauri-apps/api/core'
-import type { DeskFlowApi } from '@/services/api'
+import type { CarpeteaApi } from '@/services/api'
 import type { DirProbe, DuplicateProgress, DuplicateSearch, Environment, ExecProgress, IndexedFolderRaw, Operation, PickedFolder, ScanProgress, ScanResult, SourceFolder } from '@/types'
 
 function channel<T>(cb: (p: T) => void) {
@@ -22,7 +22,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
   }
 }
 
-export const tauriApi: DeskFlowApi = {
+export const tauriApi: CarpeteaApi = {
   mode: 'native',
 
   environment: () => call<Environment>('environment'),

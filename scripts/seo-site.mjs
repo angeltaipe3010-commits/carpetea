@@ -6,7 +6,7 @@
 //   npm run seo        (también lo ejecuta "npm run site")
 import { readFileSync, writeFileSync } from 'node:fs'
 
-export const SITE = 'https://deskflow-q8pc.vercel.app'
+export const SITE = 'https://carpetea.vercel.app'
 const file = 'website/index.html'
 
 const text = (html) =>

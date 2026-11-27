@@ -160,7 +160,7 @@ pub fn undo(db: &Db, op_id: &str, mut progress: impl FnMut(ExecProgress)) -> Res
         let to = PathBuf::from(&m.to);
         let from = PathBuf::from(&m.from);
         let check = (|| -> Result<(), String> {
-            let now_fp = fingerprint(&to).ok_or("Ya no está donde DeskFlow lo dejó.")?;
+            let now_fp = fingerprint(&to).ok_or("Ya no está donde Carpetea lo dejó.")?;
             if let Some(saved) = db.move_fingerprint(&op.id, &m.file_id).map_err(|e| e.to_string())? {
                 if saved != now_fp {
                     return Err("Se modificó después de organizarlo. Se dejó en su ubicación actual.".into());

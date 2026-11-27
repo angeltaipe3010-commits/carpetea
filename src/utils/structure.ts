@@ -16,7 +16,7 @@ import type { Classification, FileEntry, IndexedFolderRaw } from '@/types'
 import { categoryOf } from '@/services/classifier'
 
 export interface IndexedFolder {
-  /** Segmentos lógicos del árbol de DeskFlow (con el prefijo de la raíz). */
+  /** Segmentos lógicos del árbol de Carpetea (con el prefijo de la raíz). */
   segs: string[]
   name: string
   depth: number
@@ -268,7 +268,7 @@ export function matchFolder(idx: StructureIndex, file: FileEntry): { folder: Ind
   return { folder: best.folder, matched: best.matched, strong: best.nameHits >= 2 && !alt, alt: alt?.folder }
 }
 
-// Equivalencias para encajar las categorías de DeskFlow en carpetas existentes.
+// Equivalencias para encajar las categorías de Carpetea en carpetas existentes.
 const SYNONYMS: Record<string, string[]> = {
   documentos: ['documentos', 'documents', 'docs', 'mis documentos'],
   imagenes: ['imagenes', 'images', 'pictures', 'fotos', 'mis imagenes'],

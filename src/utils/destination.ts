@@ -68,7 +68,7 @@ const MERGES_INTO_LIBRARY = new Set(['Documentos', 'Imágenes', 'Videos', 'Audio
 
 /**
  * Raíces cuya estructura se aprende para "Usar mi estructura", con el prefijo
- * lógico que tienen en el árbol de DeskFlow.
+ * lógico que tienen en el árbol de Carpetea.
  */
 export function structureRoots(dest: Destination, sourcePath: string, libs: Libraries): { root: string; prefix: string[] }[] {
   if (dest.mode === 'custom' && dest.customPath) return [{ root: dest.customPath, prefix: [] }]

@@ -48,6 +48,6 @@ export const useSettings = create<SettingsState>()(
       removeExclusion: (path) => set((s) => ({ exclusions: s.exclusions.filter((e) => e !== path) })),
       reset: () => set(defaults),
     }),
-    { name: 'deskflow:settings', storage: prefsStorage },
+    { name: 'carpetea:settings', storage: prefsStorage },
   ),
 )

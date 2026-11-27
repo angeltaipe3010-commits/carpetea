@@ -1,6 +1,6 @@
-DeskFlow — avisos de terceros
+Carpetea — avisos de terceros
 
-DeskFlow incluye software de terceros (271 paquetes). A continuación están
+Carpetea incluye software de terceros (271 paquetes). A continuación están
 sus licencias; los paquetes con el mismo texto de licencia aparecen juntos, con
 cada aviso de copyright distinto.
 Generado con scripts/third-party-notices.mjs.

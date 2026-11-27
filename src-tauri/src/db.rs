@@ -58,10 +58,41 @@ pub fn now() -> String {
     chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string()
 }
 
+/// Carpeta y base de datos de la app cuando se llamaba DeskFlow (versión 1.0.0).
+const LEGACY_DIR: &str = "app.deskflow.desktop";
+const LEGACY_DB: &str = "deskflow.db";
+/// Prefijo de las claves de preferencias de entonces.
+const LEGACY_PREFIX: &str = "deskflow:";
+
+/// Si `db_path` aún no existe y hay datos de DeskFlow 1.0.0 en la carpeta
+/// hermana, los copia (historial, carpetas autorizadas, preferencias y reglas).
+/// El original no se modifica ni se borra. Devuelve si importó algo.
+pub fn import_legacy(db_path: &Path) -> rusqlite::Result<bool> {
+    let Some(legacy) = db_path.parent().and_then(Path::parent).map(|p| p.join(LEGACY_DIR).join(LEGACY_DB)) else {
+        return Ok(false);
+    };
+    if db_path.exists() || !legacy.is_file() {
+        return Ok(false);
+    }
+    // VACUUM INTO copia también lo que siga en el registro WAL, en un archivo nuevo.
+    let tmp = db_path.with_extension("db.import");
+    let _ = std::fs::remove_file(&tmp);
+    let source = Connection::open_with_flags(&legacy, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    source.execute("VACUUM INTO ?1", params![tmp.to_string_lossy()])?;
+    drop(source);
+    std::fs::rename(&tmp, db_path).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+    Ok(true)
+}
+
 impl Db {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         let conn = Connection::open(path)?;
         conn.execute_batch(SCHEMA)?;
+        // Claves de DeskFlow 1.0.0 ("deskflow:settings") con el nombre nuevo.
+        conn.execute(
+            "UPDATE OR IGNORE prefs SET key = 'carpetea:' || substr(key, ?2) WHERE key LIKE ?1",
+            params![format!("{LEGACY_PREFIX}%"), LEGACY_PREFIX.len() as i64 + 1],
+        )?;
         let db = Db(conn);
         db.recover()?;
         Ok(db)
@@ -220,5 +251,48 @@ impl Db {
             [],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn importa_los_datos_de_deskflow_sin_tocar_el_original() {
+        let tmp = crate::test_dir();
+        let old_dir = tmp.path().join(LEGACY_DIR);
+        std::fs::create_dir_all(&old_dir).unwrap();
+        let old_db = old_dir.join(LEGACY_DB);
+        {
+            // Base de datos de la versión 1.0.0, con datos aún en el registro WAL.
+            let conn = Connection::open(&old_db).unwrap();
+            conn.execute_batch(SCHEMA).unwrap();
+            conn.execute("INSERT INTO prefs (key, value) VALUES ('deskflow:settings', '{\"tema\":1}')", []).unwrap();
+            conn.execute("INSERT INTO allowed (path) VALUES (?1)", params![r"C:\Users\x\Downloads"]).unwrap();
+            let before = std::fs::read(&old_db).unwrap().len();
+            let new_db = tmp.path().join("app.carpetea.desktop").join("carpetea.db");
+            std::fs::create_dir_all(new_db.parent().unwrap()).unwrap();
+
+            assert!(import_legacy(&new_db).unwrap());
+            let db = Db::open(&new_db).unwrap();
+            assert_eq!(db.pref("carpetea:settings").unwrap().as_deref(), Some("{\"tema\":1}"));
+            assert_eq!(db.pref("deskflow:settings").unwrap(), None);
+            assert_eq!(db.allowed().unwrap(), vec![r"C:\Users\x\Downloads".to_string()]);
+            // El original sigue ahí y con sus datos.
+            assert_eq!(std::fs::read(&old_db).unwrap().len(), before);
+            let still: String = conn.query_row("SELECT key FROM prefs", [], |r| r.get(0)).unwrap();
+            assert_eq!(still, "deskflow:settings");
+            // Una segunda vez no hace nada: ya existe la base nueva.
+            assert!(!import_legacy(&new_db).unwrap());
+        }
+    }
+
+    #[test]
+    fn sin_datos_antiguos_no_importa_nada() {
+        let tmp = crate::test_dir();
+        let new_db = tmp.path().join("app.carpetea.desktop").join("carpetea.db");
+        assert!(!import_legacy(&new_db).unwrap());
+        assert!(!new_db.exists());
     }
 }

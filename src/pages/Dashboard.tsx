@@ -75,7 +75,7 @@ export default function Dashboard() {
             </Badge>
             <h2 className="mt-3 text-[19px] font-semibold tracking-[-0.015em] text-text">Organiza menos. Encuentra más.</h2>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
-              DeskFlow analiza una carpeta, propone una estructura a la medida de lo que contiene y no mueve nada hasta que lo confirmes.
+              Carpetea analiza una carpeta, propone una estructura a la medida de lo que contiene y no mueve nada hasta que lo confirmes.
             </p>
           </div>
           <Button variant="primary" size="lg" icon={FolderSync} onClick={() => navigate('/organizar')}>

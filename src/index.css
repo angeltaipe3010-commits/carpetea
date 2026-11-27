@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ───────────────────────── Design tokens ─────────────────────────
-   Paleta del blueprint de DeskFlow. Los valores viven en variables
+   Paleta del blueprint de Carpetea. Los valores viven en variables
    para que el modo oscuro solo redefina colores, no componentes.
    `text-muted` (#5F6679) es más oscuro que el Secondary (#8991A3) del
    blueprint para cumplir contraste AA en texto pequeño; #8991A3 se

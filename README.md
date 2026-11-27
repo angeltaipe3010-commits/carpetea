@@ -1,8 +1,10 @@
-# DeskFlow
+# Carpetea
 
 **Organiza menos. Encuentra más.**
 
-DeskFlow es un organizador inteligente de archivos para escritorio (Windows primero). Analiza una carpeta, propone una estructura de carpetas y subcarpetas según su contenido real y no mueve nada hasta que el usuario lo confirma. Todo funciona en local.
+Carpetea es un organizador inteligente de archivos para escritorio (Windows primero). Analiza una carpeta, propone una estructura de carpetas y subcarpetas según su contenido real y no mueve nada hasta que el usuario lo confirma. Todo funciona en local.
+
+> **Antes se llamaba DeskFlow.** Desde la versión 1.0.1 se llama Carpetea, para no confundirse con otros programas llamados Deskflow. Al abrir Carpetea por primera vez, copia el historial, las carpetas autorizadas, las preferencias y las reglas de DeskFlow 1.0.0 (si existen) sin modificar los originales. Después se puede desinstalar DeskFlow desde *Configuración → Aplicaciones* de Windows.
 
 > **Estado: versión 1.0.** App de escritorio para Windows (Tauri 2 + Rust) que analiza, organiza, aparta duplicados y deshace operaciones sobre **carpetas reales**, con instalador propio. En el navegador (`npm run dev`) sigue funcionando el prototipo con datos simulados. El monitoreo de carpetas llega en una versión posterior.
 
@@ -12,7 +14,7 @@ Requisitos en Windows: Node.js 20+, [Rust](https://rustup.rs) (toolchain MSVC), 
 
 ```bash
 npm install
-npm run tauri dev      # abre la ventana de DeskFlow con el motor real
+npm run tauri dev      # abre la ventana de Carpetea con el motor real
 npm run tauri build    # genera el instalador (NSIS) en src-tauri/target/release/bundle/nsis
 cd src-tauri && cargo test   # pruebas del motor en carpetas temporales
 npm run test:e2e       # QA de la app de escritorio real (Playwright)
@@ -20,12 +22,12 @@ npm run test:e2e       # QA de la app de escritorio real (Playwright)
 
 ### QA de la app de escritorio (`e2e/desktop`)
 
-Playwright se conecta a la ventana real de DeskFlow por CDP (WebView2 lo permite en Windows), así que las pruebas usan el motor de Rust y el disco de verdad:
+Playwright se conecta a la ventana real de Carpetea por CDP (WebView2 lo permite en Windows), así que las pruebas usan el motor de Rust y el disco de verdad:
 - El fixture crea una carpeta aislada en `e2e/.sandbox/`, con un *Origen* de descargas falsas y un *Destino* con estructura propia.
-- Arranca una **segunda instancia** de la compilación de depuración, con base de datos y perfil de WebView2 propios, y la borra al terminar (`DESKFLOW_E2E_KEEP=1` para conservarla).
-- Nunca toca tus carpetas ni tu historial: con `DESKFLOW_E2E_ROOT` el motor queda **encerrado** en la carpeta de pruebas y rechaza cualquier otra ruta. Los ganchos `DESKFLOW_E2E_ROOT` y `DESKFLOW_DATA_DIR` solo existen en compilaciones de depuración.
+- Arranca una **segunda instancia** de la compilación de depuración, con base de datos y perfil de WebView2 propios, y la borra al terminar (`CARPETEA_E2E_KEEP=1` para conservarla).
+- Nunca toca tus carpetas ni tu historial: con `CARPETEA_E2E_ROOT` el motor queda **encerrado** en la carpeta de pruebas y rechaza cualquier otra ruta. Los ganchos `CARPETEA_E2E_ROOT` y `CARPETEA_DATA_DIR` solo existen en compilaciones de depuración.
 - `regressions.spec.ts` fija los fallos que encontró el QA exploratorio (doble clic al confirmar, carpetas «..», foco de los diálogos, descartar cambios). Los specs exploratorios del agente tester viven en `e2e/.explore/` (fuera de git): `npx playwright test -c e2e/.explore/playwright.config.ts`.
-- Requiere `src-tauri/target/debug/deskflow.exe` (lo genera `npm run tauri dev`).
+- Requiere `src-tauri/target/debug/carpetea.exe` (lo genera `npm run tauri dev`).
 
 Cubre, por orden de riesgo:
 - No sobrescribir.
@@ -47,21 +49,21 @@ Cubre, por orden de riesgo:
 | `organizer.rs` | Ejecuta el plan confirmado y deshace. Solo mueve archivos del último análisis que no hayan cambiado; deshacer verifica tamaño y fecha antes de devolver cada archivo y retira las carpetas creadas que quedan vacías |
 | `duplicates.rs` | Duplicados por contenido en tres pasadas: tamaño, hash de los primeros 64 KiB y hash completo (BLAKE3). No abre archivos que solo están en la nube (los descargaría), respeta las exclusiones y no entra en proyectos de código ni programas portables. Informa de lo que no pudo comparar. Las copias se apartan en `<carpeta>/Por revisar/Duplicados` con el motor del organizador (siempre queda una copia por grupo): nada se borra y se puede deshacer |
 | `logging.rs` | Registro local de errores y pánicos |
-| `db.rs` | Diario en SQLite (`deskflow.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas. También guarda carpetas autorizadas, carpetas gestionadas y una copia de las preferencias y reglas |
+| `db.rs` | Diario en SQLite (`carpetea.db` en la carpeta de datos de la app). Cada movimiento se anota antes de hacerse; al arrancar repara operaciones interrumpidas. También guarda carpetas autorizadas, carpetas gestionadas y una copia de las preferencias y reglas |
 | `safety.rs` | Detección de nube (raíces de OneDrive del sistema, nombres de clientes y atributos de archivos en la nube), rutas del sistema, carpetas autorizadas y nombres no válidos (`..`, `CON`, terminados en punto) |
 
 **Permisos:** la interfaz no tiene acceso al disco (ningún plugin de sistema de archivos). Rust solo opera en carpetas elegidas en el selector nativo o sugeridas por la app (Descargas, Escritorio, bibliotecas), y rechaza las del sistema y `AppData`.
 
 **Preferencias y reglas:** se leen de `localStorage` (sin parpadeo al abrir) y cada cambio se copia en SQLite. Si se borran los datos del WebView o se reinstala la app, al arrancar se recuperan de SQLite (`src/services/prefs.ts`).
 
-**Instalador:** `npm run tauri build` genera `DeskFlow_1.0.0_x64-setup.exe` en `src-tauri/target/release/bundle/nsis` (en español, se instala para el usuario actual sin pedir permisos de administrador y muestra la licencia). Instala también `LICENSE.txt` y `THIRD_PARTY_NOTICES.txt` junto al programa. El icono sale de `src-tauri/app-icon.svg` (`npx tauri icon src-tauri/app-icon.svg`).
+**Instalador:** `npm run tauri build` genera `Carpetea_<versión>_x64-setup.exe` en `src-tauri/target/release/bundle/nsis` (en español, se instala para el usuario actual sin pedir permisos de administrador y muestra la licencia). Instala también `LICENSE.txt` y `THIRD_PARTY_NOTICES.txt` junto al programa. El icono sale de `src-tauri/app-icon.svg` (`npx tauri icon src-tauri/app-icon.svg`).
 
 **Antes de publicar una versión:**
 1. `npm run notices` para regenerar `THIRD_PARTY_NOTICES.txt` (licencias de npm y de las crates de Rust que van en el ejecutable).
 2. `npm run tauri build`.
-3. Publica junto al instalador su SHA-256 (`certutil -hashfile DeskFlow_1.0.0_x64-setup.exe SHA256`). El instalador no está firmado: Windows SmartScreen mostrará «Editor desconocido» la primera vez («Más información» → «Ejecutar de todas formas»), y la huella permite comprobar que el archivo es el original.
+3. Publica junto al instalador su SHA-256 (`certutil -hashfile Carpetea_<versión>_x64-setup.exe SHA256`). El instalador no está firmado: Windows SmartScreen mostrará «Editor desconocido» la primera vez («Más información» → «Ejecutar de todas formas»), y la huella permite comprobar que el archivo es el original.
 
-**Registro de errores:** el motor y la interfaz escriben en `%LOCALAPPDATA%\app.deskflow.desktop\logs\deskflow.log` (incluidos los pánicos; se rota al superar 1 MB). Nunca se envía: en *Configuración → Acerca de* hay un botón para abrir la carpeta y adjuntarlo al pedir ayuda.
+**Registro de errores:** el motor y la interfaz escriben en `%LOCALAPPDATA%\app.carpetea.desktop\logs\carpetea.log` (incluidos los pánicos; se rota al superar 1 MB). Nunca se envía: en *Configuración → Acerca de* hay un botón para abrir la carpeta y adjuntarlo al pedir ayuda.
 
 ## Página web (`website/`)
 
@@ -70,16 +72,16 @@ Página de presentación con el botón de descarga. Es estática (HTML, CSS y JS
 ```bash
 npm run tauri build   # genera el instalador
 npm run site          # actualiza versión, tamaño, SHA-256 y enlace de la Release en la página
-gh release create v1.0.0 src-tauri/target/release/bundle/nsis/DeskFlow_1.0.0_x64-setup.exe website/downloads/SHA256SUMS.txt
+gh release create v<versión> src-tauri/target/release/bundle/nsis/Carpetea_<versión>_x64-setup.exe website/downloads/SHA256SUMS.txt
 ```
 
-Los botones de descarga apuntan al instalador de la [Release de GitHub](https://github.com/angeltaipe3010-commits/deskflow/releases) y el `.exe` no se guarda en git (`website/downloads/*.exe`). La web se despliega en Vercel: `vercel.json` copia `website/` a `dist/` y la sirve tal cual (sin instalar dependencias), así que basta con importar el repositorio en Vercel y cada push a `main` la publica. Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
+Los botones de descarga apuntan al instalador de la [Release de GitHub](https://github.com/angeltaipe3010-commits/carpetea/releases) y el `.exe` no se guarda en git (`website/downloads/*.exe`). La web se despliega en Vercel: `vercel.json` copia `website/` a `dist/` y la sirve tal cual (sin instalar dependencias), así que basta con importar el repositorio en Vercel y cada push a `main` la publica. Las capturas se regeneran con `node scripts/site-shots.mjs` (requiere `npm run dev` y Microsoft Edge).
 
-**Descarga:** [última versión](https://github.com/angeltaipe3010-commits/deskflow/releases/latest).
+**Descarga:** [última versión](https://github.com/angeltaipe3010-commits/carpetea/releases/latest).
 
 ## Licencia
 
-DeskFlow se distribuye con licencia [MIT](LICENSE): se ofrece tal cual, sin garantía. Las licencias del software de terceros que incluye están en `THIRD_PARTY_NOTICES.txt`.
+Carpetea se distribuye con licencia [MIT](LICENSE): se ofrece tal cual, sin garantía. Las licencias del software de terceros que incluye están en `THIRD_PARTY_NOTICES.txt`.
 
 ---
 
@@ -99,7 +101,7 @@ npm run dev        # http://localhost:1420
 | `npm run preview` | Sirve la compilación de producción |
 | `npm run lint` | Revisión con oxlint |
 
-Las preferencias, reglas e historial del prototipo se guardan en `localStorage`. Para empezar de cero, borra las claves `deskflow:*` en las herramientas del navegador.
+Las preferencias, reglas e historial del prototipo se guardan en `localStorage`. Para empezar de cero, borra las claves `carpetea:*` en las herramientas del navegador.
 
 ---
 
@@ -129,12 +131,12 @@ Las preferencias, reglas e historial del prototipo se guardan en `localStorage`.
 - **Otra carpeta:** cualquier carpeta local, elegida con el selector, que también permite crear carpetas nuevas.
 - **Nube solo con confirmación:** si el destino está sincronizado (OneDrive, Google Drive, Dropbox, iCloud, Box, MEGA), incluidas las bibliotecas de Windows redirigidas a OneDrive, aparece un aviso “¿Guardar en OneDrive?”.
   - **Sí:** se permite. Queda señalado en el destino, en la vista previa y en la confirmación.
-  - **No:** DeskFlow busca una carpeta Documentos que esté solo en el equipo y la usa. Si no existe, la crea (`C:\Users\…\Documentos`). Se puede cambiar después.
+  - **No:** Carpetea busca una carpeta Documentos que esté solo en el equipo y la usa. Si no existe, la crea (`C:\Users\…\Documentos`). Se puede cambiar después.
   - Cerrar el aviso sin elegir no cambia nada. Las carpetas del sistema siguen bloqueadas.
 - **Escenario simulado:** el prototipo imita un Windows 11 con la copia de seguridad de OneDrive activada (Documentos e Imágenes en OneDrive, sin carpeta Documentos local), para que se pueda probar el flujo completo.
-- **No reorganiza lo ya ordenado:** DeskFlow recuerda las carpetas que creó y las omite al volver a analizar el origen. Si deshaces una operación, esas carpetas vuelven a analizarse.
+- **No reorganiza lo ya ordenado:** Carpetea recuerda las carpetas que creó y las omite al volver a analizar el origen. Si deshaces una operación, esas carpetas vuelven a analizarse.
 
-**Usar mi estructura** (activado por defecto; se puede desactivar en Organizar o en Configuración). Antes de proponer, DeskFlow lee la estructura del destino (solo nombres) y decide en este orden:
+**Usar mi estructura** (activado por defecto; se puede desactivar en Organizar o en Configuración). Antes de proponer, Carpetea lee la estructura del destino (solo nombres) y decide en este orden:
 1. **Reglas.** Tienen prioridad, pero su destino se encaja en tus carpetas equivalentes (por ejemplo, `Documentos/Finanzas/Facturas` pasa a tu `Finanzas/Recibos y facturas`).
 2. **Tus carpetas.** Busca la carpeta existente que mejor coincide con el nombre del archivo:
    - Usa las palabras del nombre de la carpeta, ponderadas por rareza: "orientada" pesa más que "cibertec".
@@ -158,7 +160,7 @@ No se usan como destino las carpetas de proyectos de código (con `package.json`
 src/
 ├── types/            Contrato de dominio (se reflejará en structs de Rust)
 ├── services/
-│   ├── api.ts        Interfaz DeskFlowApi + implementación mock
+│   ├── api.ts        Interfaz CarpeteaApi + implementación mock
 │   └── classifier.ts Clasificador de referencia (niveles 1–3 + confianza)
 ├── utils/
 │   ├── plan.ts       Árbol, conflictos y plan final (funciones puras)
@@ -178,7 +180,7 @@ src/
 
 ### Decisiones
 
-1. **Una sola interfaz de servicios (`DeskFlowApi`).** Las pantallas solo hablan con `api`. En la Fase 2 se añade `tauriApi` (comandos `invoke` + eventos de progreso) y se cambia una línea, sin tocar las pantallas.
+1. **Una sola interfaz de servicios (`CarpeteaApi`).** Las pantallas solo hablan con `api`. En la Fase 2 se añade `tauriApi` (comandos `invoke` + eventos de progreso) y se cambia una línea, sin tocar las pantallas.
 2. **El clasificador es la especificación del motor de Rust.** `classifier.ts` define entradas, salidas, motivos y niveles de confianza. Al portarlo, los mismos casos deben dar los mismos resultados.
 3. **Plan derivado, no duplicado.** El árbol, los conflictos y el plan final salen de funciones puras sobre el mismo borrador (`utils/plan.ts`). La vista previa y la ejecución no pueden desincronizarse.
 4. **Seguridad en el contrato.** Los estados `pending · in_progress · completed · partial · failed · rolled_back` y los registros por archivo (`moved · skipped · failed · restored · not_restored`) ya existen en los tipos, para que el motor real los rellene.
@@ -201,7 +203,6 @@ src/
 - **Monitoreo de carpetas** (organizar Descargas al llegar archivos nuevos) no está implementado; la interfaz lo marca como «Próximamente».
 - **Firma digital:** el instalador no está firmado. Firmarlo (Azure Trusted Signing o un certificado OV) quita el aviso de SmartScreen y reduce falsos positivos de antivirus.
 - **Actualizaciones:** no hay comprobación automática de versiones nuevas (`tauri-plugin-updater`).
-- **Nombre:** existe otro proyecto de código abierto llamado Deskflow (compartir teclado y ratón) que también distribuye `deskflow.exe`. Conviene revisarlo antes de una difusión amplia.
 - **Migraciones de la base de datos:** el esquema aún no lleva versión (`PRAGMA user_version`); hará falta antes de cambiarlo en la 1.1.
 - **Dependencias:** `rusqlite` usa `libsqlite3-sys` 0.30 (aviso RUSTSEC-2026-0459, solo explotable con una base de datos manipulada en el propio equipo); actualizar en la próxima versión.
 - **Arrastrar carpetas desde el Explorador** a la ventana no está implementado. `dragDropEnabled` está en `false` para que funcione el arrastre interno del árbol.

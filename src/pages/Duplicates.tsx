@@ -124,7 +124,7 @@ export default function Duplicates() {
     <Page>
       <PageHeader
         title="Duplicados"
-        description="Encuentra archivos con contenido idéntico, aunque tengan nombres distintos. DeskFlow nunca los elimina: los aparta para que decidas."
+        description="Encuentra archivos con contenido idéntico, aunque tengan nombres distintos. Carpetea nunca los elimina: los aparta para que decidas."
         actions={
           groups && groups.length > 0 ? (
             <Button icon={ScanSearch} onClick={() => setGroups(null)}>

@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
           <h1 className="text-[17px] font-semibold text-text">Algo salió mal en esta pantalla</h1>
           <p className="mt-2 text-[13.5px] text-muted">
             Tus archivos no se han visto afectados: cada movimiento se registra y se puede deshacer desde el Historial. El error se guardó en el
-            registro de DeskFlow.
+            registro de Carpetea.
           </p>
           <button
             type="button"

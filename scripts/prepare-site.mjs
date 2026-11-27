@@ -12,7 +12,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileS
 import { join } from 'node:path'
 
 const version = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version
-const file = `DeskFlow_${version}_x64-setup.exe`
+const file = `Carpetea_${version}_x64-setup.exe`
 const built = join('src-tauri', 'target', 'release', 'bundle', 'nsis', file)
 if (!existsSync(built)) {
   console.error(`No existe ${built}. Genera antes el instalador con "npm run tauri build".`)
@@ -29,14 +29,18 @@ writeFileSync(join(out, 'SHA256SUMS.txt'), `${sha}  ${file}\n`)
 const mb = (statSync(built).size / 1024 / 1024).toFixed(1).replace('.', ',')
 let html = readFileSync('website/index.html', 'utf8')
 html = html
-  .replace(/DeskFlow_[\d.]+_x64-setup\.exe/g, file)
+  .replace(/Carpetea_[\d.]+_x64-setup\.exe/g, file)
   .replace(/releases\/download\/v[\d.]+\//g, `releases/download/v${version}/`)
   .replace(/(<code id="sha"[^>]*>)[0-9a-f]{64}(<\/code>)/, `$1${sha}$2`)
   .replace(/\d+,\d MB/g, `${mb} MB`)
   .replace(/Versión <b>[\d.]+<\/b>/, `Versión <b>${version}</b>`)
-  .replace(/Descargar DeskFlow [\d.]+/, `Descargar DeskFlow ${version}`)
-  .replace(/DeskFlow [\d.]+<\/span>/, `DeskFlow ${version}</span>`)
+  .replace(/Descargar Carpetea [\d.]+/, `Descargar Carpetea ${version}`)
+  .replace(/Carpetea [\d.]+<\/span>/, `Carpetea ${version}</span>`)
   .replace(/"softwareVersion": "[\d.]+"/, `"softwareVersion": "${version}"`)
 writeFileSync('website/index.html', html)
+const llms = readFileSync('website/llms.txt', 'utf8')
+  .replace(/Versión actual: [\d.]+\./, `Versión actual: ${version}.`)
+  .replace(/\d+,\d MB/g, `${mb} MB`)
+writeFileSync('website/llms.txt', llms)
 await import('./seo-site.mjs')
 console.log(`website/ lista: ${file} (${mb} MB)\nSHA-256 ${sha}`)

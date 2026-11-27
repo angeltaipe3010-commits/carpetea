@@ -7,7 +7,7 @@ import type { Operation } from '@/types'
 interface HistoryState {
   operations: Operation[]
   /**
-   * Carpetas creadas por DeskFlow (rutas absolutas). Se omiten al volver a
+   * Carpetas creadas por Carpetea (rutas absolutas). Se omiten al volver a
    * analizar un origen, para no reorganizar lo que ya está ordenado.
    * En la Fase 2 será una tabla en SQLite.
    */
@@ -26,7 +26,7 @@ const noStorage: StateStorage = { getItem: () => null, setItem: () => {}, remove
 // Copias de versiones anteriores que guardaban el historial aquí.
 if (native) {
   try {
-    localStorage.removeItem('deskflow:history')
+    localStorage.removeItem('carpetea:history')
   } catch {
     /* sin acceso a localStorage: no pasa nada */
   }
@@ -48,7 +48,7 @@ export const useHistory = create<HistoryState>()(
       },
     }),
     {
-      name: 'deskflow:history',
+      name: 'carpetea:history',
       storage: createJSONStorage(() => (native ? noStorage : localStorage)),
       // v2: rutas absolutas y carpetas gestionadas. Los datos de la v1 eran de ejemplo.
       version: 2,

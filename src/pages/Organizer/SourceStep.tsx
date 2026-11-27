@@ -52,7 +52,7 @@ export default function SourceStep() {
           <h2 id="src-title" className="text-[14px] font-semibold text-text">
             ¿Qué carpeta quieres organizar?
           </h2>
-          <p className="mt-0.5 text-[13px] text-muted">DeskFlow solo accede a la carpeta que elijas.</p>
+          <p className="mt-0.5 text-[13px] text-muted">Carpetea solo accede a la carpeta que elijas.</p>
 
           <motion.div variants={list} initial="initial" animate="animate" role="radiogroup" aria-label="Carpeta de origen" className="mt-4 grid gap-2.5">
             {folders === null
@@ -101,7 +101,7 @@ export default function SourceStep() {
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-medium text-text">Elegir otra carpeta</div>
               <div className="text-[12px] text-faint">
-                {isNative ? 'Abre el selector de Windows. DeskFlow solo tendrá acceso a esa carpeta.' : 'Disponible en la app de escritorio.'}
+                {isNative ? 'Abre el selector de Windows. Carpetea solo tendrá acceso a esa carpeta.' : 'Disponible en la app de escritorio.'}
               </div>
             </div>
             <Button size="sm" disabled={!isNative} onClick={browse}>

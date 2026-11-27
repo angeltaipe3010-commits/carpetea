@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DeskFlow",
-  "version": "1.0.0",
-  "identifier": "app.deskflow.desktop",
+  "productName": "Carpetea",
+  "version": "1.0.1",
+  "identifier": "app.carpetea.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DeskFlow",
+        "title": "Carpetea",
         "width": 1320,
         "height": 840,
         "minWidth": 960,
@@ -44,7 +44,7 @@
     "copyright": "© 2026 Angel Taipe",
     "category": "Utility",
     "shortDescription": "Organizador inteligente de archivos, local-first",
-    "longDescription": "DeskFlow analiza una carpeta, propone una estructura según tus carpetas y no mueve nada sin tu confirmación. Nunca borra ni sobrescribe, y todo se puede deshacer.",
+    "longDescription": "Carpetea analiza una carpeta, propone una estructura según tus carpetas y no mueve nada sin tu confirmación. Nunca borra ni sobrescribe, y todo se puede deshacer.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

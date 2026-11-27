@@ -35,7 +35,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center gap-2.5 px-4 max-[900px]:justify-center max-[900px]:px-0">
         <Logo className="size-8 shrink-0" />
         <div className="min-w-0 leading-tight max-[900px]:hidden">
-          <div className="text-[14.5px] font-semibold tracking-[-0.01em] text-text">DeskFlow</div>
+          <div className="text-[14.5px] font-semibold tracking-[-0.01em] text-text">Carpetea</div>
           <div className="text-[11.5px] text-faint">Workspace · v1.0</div>
         </div>
       </div>

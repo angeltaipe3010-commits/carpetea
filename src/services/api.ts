@@ -1,7 +1,7 @@
 /**
- * Capa de servicios de DeskFlow.
+ * Capa de servicios de Carpetea.
  *
- * `DeskFlowApi` es el contrato con el motor. Hay dos implementaciones:
+ * `CarpeteaApi` es el contrato con el motor. Hay dos implementaciones:
  * - `mockApi` (este archivo): todo en memoria, para el navegador y el prototipo.
  * - `tauriApi` (`tauriApi.ts`): comandos de Rust dentro de la app de escritorio.
  * Las pantallas solo usan `api` y no saben cuál está activa.
@@ -33,7 +33,7 @@ import { uid } from '@/lib/id'
 import { cloudProvider } from '@/utils/destination'
 export { NotAvailableError } from '@/services/errors'
 
-export interface DeskFlowApi {
+export interface CarpeteaApi {
   /** `mock`: datos simulados. `native`: disco real a través de Rust. */
   readonly mode: 'mock' | 'native'
   environment(): Promise<Environment>
@@ -48,7 +48,7 @@ export interface DeskFlowApi {
   checkAccess(paths: string[]): Promise<boolean[]>
   /** Estructura de carpetas existente bajo `root` (solo lectura). `skip`: rutas absolutas a omitir. */
   indexStructure(root: string, maxDepth: number, skip: string[]): Promise<IndexedFolderRaw[]>
-  /** `skipDirs`: carpetas relativas al origen que DeskFlow ya organizó. */
+  /** `skipDirs`: carpetas relativas al origen que Carpetea ya organizó. */
   scan(
     source: SourceFolder,
     opts: ScanOptions,
@@ -85,7 +85,7 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 export const isAbort = (e: unknown) =>
   (e instanceof DOMException && e.name === 'AbortError') || (e instanceof Error && /cancelad/i.test(e.message))
 
-const mockApi: DeskFlowApi = {
+const mockApi: CarpeteaApi = {
   mode: 'mock',
 
   async environment() {
@@ -264,5 +264,5 @@ const mockApi: DeskFlowApi = {
   },
 }
 
-export const api: DeskFlowApi = isTauri() ? tauriApi : mockApi
+export const api: CarpeteaApi = isTauri() ? tauriApi : mockApi
 export const isNative = api.mode === 'native'
