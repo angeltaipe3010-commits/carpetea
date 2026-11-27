@@ -13,7 +13,8 @@
     "notices": "node scripts/third-party-notices.mjs",
     "site": "node scripts/prepare-site.mjs",
     "seo": "node scripts/seo-site.mjs",
-    "og-image": "node scripts/og-image.mjs"
+    "og-image": "node scripts/og-image.mjs",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
