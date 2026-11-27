@@ -1,0 +1,30 @@
+# DeskFlow: buscadores y asistentes de IA son bienvenidos.
+User-agent: *
+Allow: /
+
+# Asistentes de IA (búsqueda y consultas de usuarios): permitidos para que puedan citar la página.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+Sitemap: https://deskflow-q8pc.vercel.app/sitemap.xml

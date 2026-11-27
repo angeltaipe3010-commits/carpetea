@@ -3,13 +3,132 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DeskFlow — Organiza tus archivos sin perder ninguno</title>
-<meta name="description" content="DeskFlow ordena Descargas y Escritorio usando tus propias carpetas. Ves la propuesta antes de mover nada, nunca borra ni sobrescribe y todo se puede deshacer. Gratis para Windows.">
+<title>Organizador de archivos gratis para Windows | DeskFlow</title>
+<meta name="description" content="Ordena Descargas y Escritorio en tus propias carpetas. Ves la propuesta antes de mover nada, nunca borra ni sobrescribe y todo se deshace. Gratis y sin nube.">
+<link rel="canonical" href="https://deskflow-q8pc.vercel.app/">
 <meta name="theme-color" content="#e6e7ec">
-<meta property="og:title" content="DeskFlow — Organiza tus archivos sin perder ninguno">
-<meta property="og:description" content="Organizador de archivos local para Windows. Vista previa, deshacer y cero archivos borrados.">
-<meta property="og:image" content="img/ventana-vista-previa.webp">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DeskFlow">
+<meta property="og:locale" content="es_ES">
+<meta property="og:url" content="https://deskflow-q8pc.vercel.app/">
+<meta property="og:title" content="DeskFlow: organizador de archivos gratis para Windows">
+<meta property="og:description" content="Ordena Descargas y Escritorio con vista previa, sin borrar nada y con deshacer. Funciona sin internet.">
+<meta property="og:image" content="https://deskflow-q8pc.vercel.app/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Ventana de DeskFlow con la vista previa de cómo quedará la carpeta Descargas organizada.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://deskflow-q8pc.vercel.app/#website",
+      "url": "https://deskflow-q8pc.vercel.app/",
+      "name": "DeskFlow",
+      "inLanguage": "es"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://deskflow-q8pc.vercel.app/#autor",
+      "name": "Angel Taipe",
+      "url": "https://github.com/angeltaipe3010-commits"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://deskflow-q8pc.vercel.app/#app",
+      "name": "DeskFlow",
+      "description": "Organizador de archivos para Windows que ordena Descargas y Escritorio usando tus propias carpetas. Muestra la propuesta antes de mover nada, nunca borra ni sobrescribe y todo se puede deshacer.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Windows 10, Windows 11 (64 bits)",
+      "softwareVersion": "1.0.0",
+      "fileSize": "2,6 MB",
+      "downloadUrl": "https://github.com/angeltaipe3010-commits/deskflow/releases/download/v1.0.0/DeskFlow_1.0.0_x64-setup.exe",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "screenshot": "https://deskflow-q8pc.vercel.app/img/ventana-vista-previa.webp",
+      "author": { "@id": "https://deskflow-q8pc.vercel.app/#autor" },
+      "sameAs": ["https://github.com/angeltaipe3010-commits/deskflow"],
+      "inLanguage": "es"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://deskflow-q8pc.vercel.app/#preguntas",
+      "about": { "@id": "https://deskflow-q8pc.vercel.app/#app" },
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Sube mis archivos a internet?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. DeskFlow funciona sin conexión y no envía archivos, nombres ni estadísticas a ningún servidor. Todo, incluido el historial, se guarda en tu equipo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Y si no me gusta cómo quedó?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Abre Historial y pulsa Deshacer. Cada archivo vuelve a su ubicación original y las carpetas que creó DeskFlow se retiran si quedan vacías. Si un archivo estaba abierto en ese momento, puedes reintentarlo después."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Respeta las carpetas que ya tengo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Con Usar mi estructura lee cómo tienes organizadas tus carpetas y coloca cada archivo donde encaja. Si un trabajo es de un curso que aún no tiene carpeta, la crea copiando tu formato."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo ordeno la carpeta Descargas en Windows?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "En tres pasos. Abre DeskFlow, elige Descargas y pulsa Analizar. Revisa la vista previa, donde puedes renombrar carpetas y mover o excluir archivos, y confirma. Ningún archivo se mueve antes de que confirmes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo encuentra los archivos duplicados?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Compara el contenido, no el nombre: primero el tamaño, después el inicio de cada archivo y al final el archivo completo. No abre los archivos que solo están en la nube, para no descargarlos. Las copias se apartan en «Por revisar» y siempre queda una en su sitio."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué necesito para usar DeskFlow?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Windows 10 u 11 de 64 bits. El instalador ocupa 2,6 MB, se instala solo para tu usuario y no pide permisos de administrador ni una cuenta."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Windows dice «Editor desconocido». ¿Es seguro?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "El instalador todavía no lleva firma digital, por eso SmartScreen avisa la primera vez: pulsa Más información y luego Ejecutar de todas formas. Para comprobar que el archivo es el original, compara su huella SHA-256 con la que aparece abajo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto cuesta?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Nada. DeskFlow es gratis y de código abierto con licencia MIT. Se ofrece tal cual, sin garantía; como con cualquier programa que mueve archivos, conviene tener copia de seguridad de lo importante."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 html, body { background: #e6e7ec; color: #12131a; }
@@ -115,6 +234,7 @@ img { display: block; max-width: 100%; }
 .title .line > span { display: inline-block; }
 .title sup { font-size: 0.2em; font-weight: 500; letter-spacing: 0; vertical-align: top; position: relative; top: 0.6em; margin-left: 0.4em; color: var(--ink-soft); text-transform: none; }
 .title .accent { color: var(--accent); }
+.title .kicker { display: block; margin-bottom: calc(18 * var(--u)); font-size: max(calc(13 * var(--u)), 12px); font-weight: 600; line-height: 1.3; letter-spacing: 0.08em; color: var(--ink-soft); }
 .about { margin-top: calc(40 * var(--u)); max-width: calc(380 * var(--u)); }
 .label { display: inline-flex; align-items: center; gap: 8px; font-size: max(calc(12 * var(--u)), 11px); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
 .label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -365,6 +485,7 @@ img { display: block; max-width: 100%; }
     <div class="hero-grid">
       <div>
         <h1 class="title" id="hero-title">
+          <span class="kicker appear" style="--d:60ms">Organizador de archivos para Windows</span>
           <span class="line"><span style="--d:120ms">Tus archivos,</span></span>
           <span class="line"><span style="--d:230ms">en su <span class="accent">sitio</span>.</span><sup>(v1.0)</sup></span>
         </h1>
@@ -403,7 +524,7 @@ img { display: block; max-width: 100%; }
           <img src="img/ventana-vista-previa.webp" width="1600" height="994" alt="Vista previa de DeskFlow: a la izquierda el árbol de carpetas propuesto para Descargas (Documentos, Estudios, Finanzas, Imágenes) y a la derecha cada archivo con su destino y su nivel de confianza." fetchpriority="high">
         </div>
         <div class="plate appear" style="--d:900ms" aria-hidden="true">
-          <img src="img/icon.svg" alt=""><strong>DESKFLOW</strong><small>Organiza menos.<br>Encuentra más.</small>
+          <img src="img/icon.svg" width="30" height="30" alt=""><strong>DESKFLOW</strong><small>Organiza menos.<br>Encuentra más.</small>
         </div>
         <span class="chip chip--a appear" style="--d:1050ms"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg></i>Vista previa antes de mover</span>
         <span class="chip chip--b appear" style="--d:1150ms"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></i>Usa tus carpetas</span>
@@ -414,7 +535,7 @@ img { display: block; max-width: 100%; }
         <div class="news appear" style="--d:700ms">
           <div class="news-head"><span>Novedad</span><b>Duplicados</b><span>[1.0]</span></div>
           <a class="news-card" href="#como-funciona" aria-label="Ver cómo funciona la búsqueda de duplicados">
-            <img src="img/duplicados-grupo.webp" alt="Grupo de tres facturas idénticas con nombres distintos: una se conserva y las otras dos se apartan." loading="lazy">
+            <img src="img/duplicados-grupo.webp" width="1000" height="780" alt="Grupo de tres facturas idénticas con nombres distintos: una se conserva y las otras dos se apartan." loading="lazy">
             <span class="round"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
           </a>
           <div class="progress" aria-hidden="true"><i></i></div>
@@ -446,7 +567,7 @@ img { display: block; max-width: 100%; }
           <h3>Una carpeta, un clic</h3>
           <p>Descargas, Escritorio o la que quieras. DeskFlow solo toca la carpeta que eliges y nunca entra en las del sistema.</p>
         </div>
-        <div class="step-shot"><img src="img/paso-elegir.webp" alt="Selector de carpeta de DeskFlow con Descargas, Escritorio y la opción de elegir otra carpeta." loading="lazy"></div>
+        <div class="step-shot"><img src="img/paso-elegir.webp" width="1000" height="581" alt="Selector de carpeta de DeskFlow con Descargas, Escritorio y la opción de elegir otra carpeta." loading="lazy"></div>
       </article>
       <article class="step reveal" style="--d:90ms">
         <div class="step-copy">
@@ -454,7 +575,7 @@ img { display: block; max-width: 100%; }
           <h3>La vista previa manda</h3>
           <p>Mira el árbol propuesto, renombra carpetas, arrastra archivos o exclúyelos. Nada se mueve hasta que confirmas.</p>
         </div>
-        <div class="step-shot"><img src="img/paso-revisar.webp" alt="Lista de la vista previa: cada factura con su carpeta de destino, la regla que se aplicó y la confianza alta." loading="lazy"></div>
+        <div class="step-shot"><img src="img/paso-revisar.webp" width="1000" height="581" alt="Lista de la vista previa: cada factura con su carpeta de destino, la regla que se aplicó y la confianza alta." loading="lazy"></div>
       </article>
       <article class="step reveal" style="--d:180ms">
         <div class="step-copy">
@@ -462,7 +583,7 @@ img { display: block; max-width: 100%; }
           <h3>Y si no te gusta, deshaz</h3>
           <p>Cada movimiento queda en el historial. Deshacer comprueba cada archivo y lo devuelve a su sitio exacto.</p>
         </div>
-        <div class="step-shot"><img src="img/paso-deshacer.webp" alt="Operación en el historial con cada archivo movido, el que estaba en uso y el botón Deshacer." loading="lazy"></div>
+        <div class="step-shot"><img src="img/paso-deshacer.webp" width="1000" height="556" alt="Operación en el historial con cada archivo movido, el que estaba en uso y el botón Deshacer." loading="lazy"></div>
       </article>
     </div>
   </section>
@@ -495,7 +616,7 @@ img { display: block; max-width: 100%; }
           <p class="small">pruebas automáticas del motor y de la app real en cada versión.</p>
         </div>
       </div>
-      <div class="t-card t-card--shot" aria-hidden="true"><img src="img/arbol.webp" alt="" loading="lazy"></div>
+      <div class="t-card t-card--shot" aria-hidden="true"><img src="img/arbol.webp" width="600" height="768" alt="" loading="lazy"></div>
     </div>
   </section>
 
@@ -513,6 +634,18 @@ img { display: block; max-width: 100%; }
       <details>
         <summary>¿Respeta las carpetas que ya tengo?<i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i></summary>
         <p>Sí. Con <b>Usar mi estructura</b> lee cómo tienes organizadas tus carpetas y coloca cada archivo donde encaja. Si un trabajo es de un curso que aún no tiene carpeta, la crea copiando tu formato.</p>
+      </details>
+      <details>
+        <summary>¿Cómo ordeno la carpeta Descargas en Windows?<i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i></summary>
+        <p><b>En tres pasos.</b> Abre DeskFlow, elige <b>Descargas</b> y pulsa <b>Analizar</b>. Revisa la vista previa, donde puedes renombrar carpetas y mover o excluir archivos, y confirma. Ningún archivo se mueve antes de que confirmes.</p>
+      </details>
+      <details>
+        <summary>¿Cómo encuentra los archivos duplicados?<i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i></summary>
+        <p>Compara el contenido, no el nombre: primero el tamaño, después el inicio de cada archivo y al final el archivo completo. No abre los archivos que solo están en la nube, para no descargarlos. Las copias se apartan en «Por revisar» y siempre queda una en su sitio.</p>
+      </details>
+      <details>
+        <summary>¿Qué necesito para usar DeskFlow?<i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i></summary>
+        <p>Windows 10 u 11 de 64 bits. El instalador ocupa 2,6 MB, se instala solo para tu usuario y no pide permisos de administrador ni una cuenta.</p>
       </details>
       <details>
         <summary>Windows dice «Editor desconocido». ¿Es seguro?<i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i></summary>
@@ -549,6 +682,7 @@ img { display: block; max-width: 100%; }
     <a href="downloads/LICENSE.txt">Licencia MIT</a>
     <a href="downloads/SHA256SUMS.txt">SHA256SUMS</a>
     <a href="https://github.com/angeltaipe3010-commits/deskflow">Código en GitHub</a>
+    <a href="https://github.com/angeltaipe3010-commits/deskflow/issues">Reportar un problema</a>
     <a href="#top">Volver arriba</a>
   </nav>
 </footer>

@@ -36,5 +36,7 @@ html = html
   .replace(/Versión <b>[\d.]+<\/b>/, `Versión <b>${version}</b>`)
   .replace(/Descargar DeskFlow [\d.]+/, `Descargar DeskFlow ${version}`)
   .replace(/DeskFlow [\d.]+<\/span>/, `DeskFlow ${version}</span>`)
+  .replace(/"softwareVersion": "[\d.]+"/, `"softwareVersion": "${version}"`)
 writeFileSync('website/index.html', html)
+await import('./seo-site.mjs')
 console.log(`website/ lista: ${file} (${mb} MB)\nSHA-256 ${sha}`)
